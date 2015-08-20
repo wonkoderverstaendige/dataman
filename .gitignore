@@ -1,0 +1,82 @@
+#############
+## project specific
+#############
+
+testing/
+
+#############
+## Python
+#############
+
+*.py[co]
+
+# Packages
+*.egg
+*.egg-info
+dist
+build
+eggs
+parts
+bin
+var
+sdist
+develop-eggs
+.installed.cfg
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+.coverage
+.tox
+
+# Mac crap
+.DS_Store
+
+#############
+## PyCharm
+#############
+.idea/
+
+#############
+## Spyder
+#############
+
+.spyderworkspace
+.spyderproject
+
+#############
+# VIM
+#############
+
+*~
+*.swp
+*.swo
+
+#############
+## Eclipse
+#############
+
+*.pydevproject
+.project
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.classpath
+.settings/
+.loadpath
+
+############
+## Windows
+############
+
+# Windows image file caches
+Thumbs.db
+
+# Folder config file
+Desktop.ini
