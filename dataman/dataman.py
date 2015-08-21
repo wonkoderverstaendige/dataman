@@ -27,12 +27,11 @@ class DataMan(cmd.Cmd):
             print "hi there!"
 
     def do_stats(self, path):
-        if not path:
-            path = "."
-        tools.stats(path)
-        table_hdr = "{0:^25}{sep}{1}{sep}{2}{sep}{3}{sep}{4}{sep}{5}{sep}{6}{sep}".format(
-                "Folder name", "size", "#files", "#vid", "#img", "#snd", "format", sep="|")
-        print table_hdr
+        if not len(path):
+            path = '.'
+        import folderstats as fs
+        fs.print_table(fs.gather(path))
+
     def do_EOF(self, line):
         "Exit"
         return True

@@ -3,6 +3,7 @@
 from __future__ import print_function
 import tools
 import os
+import sys
 from termcolor import colored
 
 EXT_VIDEO = ['.avi', '.mp4', '.mkv', '.wmv']
@@ -11,7 +12,7 @@ EXT_IMAGE = ['.png', '.bmp', '.jpg', '.jpeg', '.pgm']
 EXT_DOC = ['.md', '.toml', '.xml', '.tsv', '.csv', '.txt', '.doc', '.rst']
 
 table_hdr = "{0:^28}{sep}{1:^6}{sep}{2:>3}{sep}{3:>3}{sep}{4:>3}{sep}{5:>3}{sep}{6:^10}{sep}".format(
-"Folder name", "size", "#fil", "#vid", "#img", "#snd", "format", sep="|")
+"Folder name", "size", "#fil", "#vid", "#img", "#snd", "format", sep=" ")
 
 _row = "{0:<28}{1}{2:>4}{3:>4}{4:>4}{5:>4}{6:>10}"
 
@@ -54,6 +55,7 @@ def dir_details(path):
             data_fmt=data_fmt)
 
 def gather(path):
+    #print("Gathering: ", path)
     root, dirs, files = next(os.walk(path))
     details = [dir_details(root)]
 
@@ -61,7 +63,7 @@ def gather(path):
         return details
     else:
         for d in dirs:
-            details.append(dir_details(d))
+            details.append(dir_details(os.path.join(root, d)))
     return details
         
 def prettify(element, color=None, align='>', width=0, sepl='', sepr=''):
@@ -113,8 +115,8 @@ def mk_row(row, colorized=True, cols=['fname', 'size', 'num_files',
             elif row[c] == 'Kwik':
                 color = 'green'
             else:
-                color = 'red'
-            row_str += prettify(row[c], 
+                color = None
+            row_str += prettify(row[c] if row[c] is not None else '', 
                     color=color if colored else None,
                     sepr=sepr, align='>', width=10)
         else:
@@ -122,8 +124,33 @@ def mk_row(row, colorized=True, cols=['fname', 'size', 'num_files',
 
     return row_str
 
+
+getch = tools._find_getch()
+def print_table(rows, color=True, page_size=-1):
+    termh, termw = tools.terminal_size()
+    if page_size is not None and page_size < 1:
+        page_size = termh - 5 
+    line_length = None
+    for i, row in enumerate(rows):
+        row_string = mk_row(row)
+        if line_length is None:
+            line_length = len(tools.strip_ansi(row_string)) 
+
+        # pause after printing full page of rows
+        if page_size is not None and page_size > 1 and i%(page_size+1) == 0:
+            if i > 1:
+                print("[MORE]")
+                c = getch()
+                sys.stdout.write("\033[F")
+                if c == 'q':
+                    print('\n ...{} not shown.'.format(len(rows)-i))
+                    break
+            print(table_hdr)
+            print('_'*line_length)
+
+        # print current line
+        print(row_string)
+ 
 if __name__ == "__main__":
-    color = True
-    print(table_hdr)
-    for row in gather(".")[:-9]:
-        print(mk_row(row))
+    print_table(gather('.'))    
+
