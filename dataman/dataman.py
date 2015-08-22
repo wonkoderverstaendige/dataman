@@ -64,17 +64,19 @@ if __name__ == "__main__":
     parser_doc = subparsers.add_parser('doc', help='Data documentation')
     parser_check = subparsers.add_parser('check', help='Check/verify data and documentation integrity')
 
-    cli_args = parser.parse_args()
+    cli_args = None
+    if len(sys.argv) > 1:
+        cli_args = parser.parse_args()
+        if cli_args.debug:
+            NO_EXIT_CONFIRMATION = True
 
-    if cli_args.debug:
-        NO_EXIT_CONFIRMATION = True
-
+    log_level = LOG_LEVEL_VERBOSE if cli_args is not None and cli_args.debug else LOG_LEVEL
     logging.addLevelName(LOG_LEVEL_VERBOSE, "VERBOSE")
-    logging.basicConfig(level=LOG_LEVEL_VERBOSE if cli_args.debug else LOG_LEVEL,
+    logging.basicConfig(level=log_level,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     log = logging.getLogger(__name__)
 
-    if cli_args.command == 'cli':
+    if cli_args is None or cli_args.command == 'cli':
         DataMan().cmdloop()
     else:
         DataMan().onecmd(' '.join(sys.argv[1:]))
