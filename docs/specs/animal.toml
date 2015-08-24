@@ -1,0 +1,20 @@
+# Contains information regarding the history of an animal
+# i.e. its origin, birth date, acclimatisation, surgeries,
+# implants, weight development and other procedures like
+# experiments, behavioral anomalies, health issues etc...
+
+id = m000x
+
+[origin]
+dob = 1979-01-27  # RFC 3339 date
+vendor = CR
+
+# facility
+[housing]
+facility = TNU
+isolated = 1979-05-20
+
+# weight in grams
+[weight]
+1979-05-27 = 27.1
+1979-05-28 = 27.4

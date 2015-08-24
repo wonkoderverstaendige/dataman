@@ -1,0 +1,11 @@
+# Contains information on the processing steps taken.
+
+processed = false
+documented = false
+
+[verification]
+# list of checks done and the result
+
+[[notes]]
+[[notes.phys]]
+[[notes.kkwik]]
