@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function
 import sys
 import logging
-import tools
 import cmd
-from constants import LOG_LEVEL_VERBOSE
+import lib.tools
+from lib.constants import LOG_LEVEL_VERBOSE
 
 class DataMan(cmd.Cmd):
     """Command line tool for quick data documentation."""
@@ -27,11 +28,17 @@ class DataMan(cmd.Cmd):
         else:
             print("hi there!")
 
+    def do_ls(self, path):
+        if not len(path):
+            path = '.'
+        import lib.dirstats as ds
+        ds.print_table(ds.gather(path))
+
     def do_stats(self, path):
         if not len(path):
             path = '.'
-        import folderstats as fs
-        fs.print_table(fs.gather(path))
+        import lib.dirstats as ds
+        ds.print_table(ds.gather(path))
 
     def do_exit(self, line):
         "Exit"

@@ -1,10 +1,14 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 from __future__ import print_function
 import tools
+from tools import fext, dir_content
 import os
 import sys
 from termcolor import colored
+import open_ephys
+import kwik
 
 EXT_VIDEO = ['.avi', '.mp4', '.mkv', '.wmv']
 EXT_SOUND = ['.wav', '.mp3', '.snd', '.wma']
@@ -16,54 +20,52 @@ table_hdr = "{0:^28}{sep}{1:^6}{sep}{2:>3}{sep}{3:>3}{sep}{4:>3}{sep}{5:>3}{sep}
 
 _row = "{0:<28}{1}{2:>4}{3:>4}{4:>4}{5:>4}{6:>10}"
 
-def check_format(*targets):
+def contains_dataset(root, dirs=None, files=None):
     """Check if directory or list of files contains a dataset of known format (OE, Kwik, etc.)"""
-    if len(targets) == 1 and os.path.isdir(targets[0]):
-        root, dirs, files = next(os.walk(targets[0])) 
-    else:
-    #    for t in targets:
-# TODO            assert(os.path.exists(t))
-        files = targets
+    if None in [dirs, files]:
+        _, dirs, files = dir_content(root)
 
-    for f in files:
-        if fext(f) in ['.continuous']:
-            return "OpenEphys"
-        elif fext(f) in ['.kwx', '.kwd', '.kwik']:
-            return "Kwik"
+    formats = [open_ephys, kwik]
+    for fmt in formats:
+        detected = fmt.detect(root, dirs, files)
+        if detected:
+            return detected
     else:
         return None
-def fext(fname):
-    return os.path.splitext(fname)[1]
 
 def dir_details(path):
-    name = path
+    root, dirs, files = dir_content(path)
+
+    name = os.path.basename(path)
     size = tools.dir_size(path)
-    root, dirs, files = next(os.walk(path))
     num_files = len(files)
     num_vid = len([f for f in files if fext(f) in EXT_VIDEO])
-    num_img= len([f for f in files if fext(f) in EXT_SOUND])
-    num_snd = len([f for f in files if fext(f) in EXT_IMAGE])
+    num_img= len([f for f in files if fext(f) in EXT_IMAGE])
+    num_snd = len([f for f in files if fext(f) in EXT_SOUND])
     num_doc = len([f for f in files if fext(f) in EXT_DOC])
-    data_fmt = check_format(*files)
-    return dict(fname=name,
-            size=size,
-            num_files=num_files,
-            num_vid=num_vid,
-            num_img=num_img,
-            num_snd=num_snd,
-            num_doc=num_doc,
+    data_fmt = contains_dataset(path)
+
+    return dict(fname=name, size=size, num_files=num_files, num_vid=num_vid,
+            num_img=num_img, num_snd=num_snd, num_doc=num_doc,
             data_fmt=data_fmt)
 
 def gather(path):
-    #print("Gathering: ", path)
-    root, dirs, files = next(os.walk(path))
-    details = [dir_details(root)]
+    """Gather details on the path and its subdirectories.
 
-    if check_format(root):
-        return details
-    else:
-        for d in dirs:
-            details.append(dir_details(os.path.join(root, d)))
+    Args:
+        path: Relative or absolute path to a directory.
+
+    Returns:
+        List of dictionaries. Each element in the list corresponds
+        to the details of a single directory (including the given as
+        [path]) in a dictionary.
+    """
+    root, dirs, files = dir_content(path) 
+
+    details = []
+    details.append(dir_details(root))
+    for d in dirs:
+        details.append(dir_details(os.path.join(root, d)))
     return details
         
 def prettify(element, color=None, align='>', width=0, sepl='', sepr=''):
@@ -93,29 +95,31 @@ def mk_row(row, colorized=True, cols=['fname', 'size', 'num_files',
             row_str += prettify(tools.fmt_size(row[c], unit='', sep='', col=True, pad=7),
 
                     sepr=sepr, align='>', width='')
+
         elif c == 'num_files':
             row_str += prettify(row[c], 
                     color='red' if row[c]==0 and colored else None,
                     sepr=sepr, align='>', width=4)
-        elif c == 'num_vid':
-            row_str += prettify(row[c], 
-                    color='green' if row[c]>0 and colored else None,
-                    sepr=sepr, align='>', width=4)
-        elif c == 'num_img':
-            row_str += prettify(row[c], 
-                    color='green' if row[c]>0 and colored else None,
-                    sepr=sepr, align='>', width=4)
-        elif c == 'num_snd':
-            row_str += prettify(row[c], 
-                    color='green' if row[c]>0 and colored else None,
-                    sepr=sepr, align='>', width=4)
-        elif c == 'data_fmt':
-            if row[c] == 'OpenEphys':
-                color = 'yellow'
-            elif row[c] == 'Kwik':
-                color = 'green'
+
+        elif c in ['num_vid', 'num_img', 'num_snd', 'num_doc']:
+            if row[c] > 0:
+                color='green' if colored else None
+                val = row[c]
             else:
+                val = ''
                 color = None
+            row_str += prettify(val, color=color, sepr=sepr, align='>', width=4)
+
+        elif c == 'data_fmt':
+            if row[c] is None:
+                color = None
+            else:
+                if 'OE' in row[c]:
+                    color = 'yellow'
+                elif 'Kw' in row[c]:
+                    color = 'green'
+                else:
+                    color = None
             row_str += prettify(row[c] if row[c] is not None else '', 
                     color=color if colored else None,
                     sepr=sepr, align='>', width=10)

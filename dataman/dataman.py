@@ -4,9 +4,10 @@
 from __future__ import print_function
 import sys
 import cmd
-import tools
 import logging
-from constants import LOG_LEVEL_VERBOSE
+
+from lib.constants import LOG_LEVEL_VERBOSE
+import lib.tools
 from dataman_cli import DataMan
 
 __version__ = 0.01
@@ -25,9 +26,15 @@ if __name__ == "__main__":
     subparsers = parser.add_subparsers(help='sub commands', dest='command')
 
     parser_cli = subparsers.add_parser('cli', help='Interactive CLI session')
-    parser_stats = subparsers.add_parser('stats', help='Directory statistics')
+
+    parser_stats = subparsers.add_parser('stats', help='Dataset statistics.')
     parser_stats.add_argument('path', help='Relative or absolute path to directory',
             default='.', nargs='?')
+
+    parser.ls = subparsers.add_parser('ls', help='Directory listing with basic stats (e.g. size)')
+    parser.ls .add_argument('path', help='Relative or absolute path to directory',
+            default='.', nargs='?')
+
     parser_proc = subparsers.add_parser('proc', help='Data processing')
     parser_doc = subparsers.add_parser('doc', help='Data documentation')
     parser_check = subparsers.add_parser('check', help='Check/verify data and documentation integrity')
