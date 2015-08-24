@@ -15,8 +15,8 @@ EXT_SOUND = ['.wav', '.mp3', '.snd', '.wma']
 EXT_IMAGE = ['.png', '.bmp', '.jpg', '.jpeg', '.pgm']
 EXT_DOC = ['.md', '.toml', '.xml', '.tsv', '.csv', '.txt', '.doc', '.rst']
 
-table_hdr = "{0:^28}{sep}{1:^6}{sep}{2:>3}{sep}{3:>3}{sep}{4:>3}{sep}{5:>3}{sep}{6:^10}{sep}".format(
-"Folder name", "size", "#fil", "#vid", "#img", "#snd", "format", sep=" ")
+table_hdr = "{:^28}{sep}{:^6}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:^10}{sep}".format(
+"Folder name", "size", "#fil", "#vid", "#img", "#snd", '#doc', "format", sep=" ")
 
 _row = "{0:<28}{1}{2:>4}{3:>4}{4:>4}{5:>4}{6:>10}"
 
@@ -85,7 +85,7 @@ def fit_str(string, max_len=10, weight=0.7):
     return string[:head]+indicator+string[-tail:]
 
 def mk_row(row, colorized=True, cols=['fname', 'size', 'num_files',
-                                         'num_vid', 'num_img', 'num_snd',
+                                         'num_vid', 'num_img', 'num_snd', 'num_doc',
                                          'data_fmt'], sepr='|'):
     row_str = ''
     for c in cols:
