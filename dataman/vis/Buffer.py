@@ -75,15 +75,16 @@ class Buffer(object):
             self.logger.error('nChannels and nSamples must be a positive integer')
             raise BufferError(1)
 
-        sizeBytes = c.sizeof(BufferHeader) + \
+        size_bytes = c.sizeof(BufferHeader) + \
             nSamples * nChannels * np.dtype(nptype).itemsize
-        raw = Array('c', sizeBytes)
+        raw = Array('c', size_bytes)
         hdr = BufferHeader.from_buffer(raw.get_obj())
 
-        hdr.bufSizeBytes = sizeBytes - c.sizeof(BufferHeader)
+        hdr.bufSizeBytes = size_bytes - c.sizeof(BufferHeader)
         hdr.dataType = datatypes.get_code(nptype)
         hdr.nChannels = nChannels
         hdr.nSamples = nSamples
+        hdr.position = 0
 
         self.initialize_from_raw(raw.get_obj())
 
@@ -228,20 +229,21 @@ class BufferHeader(c.Structure):
     ----------
     bufSizeBytes : c_ulong
         size of the buffer in bytes, excluding header and pocket
-    pocketSizeBytes : c_ulong
-        size of the buffer in bytes
     dataType : c_uint
         typecode of the data stored in the buffer
     nChannels : c_ulong
         sample dimensionality
-    nSamplesWritten : c_ulong
-        the total number of sample, written after the buffer allocation
+    nSamples : c_ulong
+        size of the buffer in samples
+    position : c_ulong
+        position in the data in samples
     """
     _pack_ = 1
     _fields_ = [('bufSizeBytes', c.c_ulong),
                 ('dataType', c.c_uint),
                 ('nChannels', c.c_ulong),
-                ('nSamples', c.c_ulong)]
+                ('nSamples', c.c_ulong),
+                ('position', c.c_ulong)]
 
 
 class BufferError(Exception):
