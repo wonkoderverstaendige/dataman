@@ -76,7 +76,7 @@ class Buffer(object):
             raise BufferError(1)
 
         sizeBytes = c.sizeof(BufferHeader) + \
-                    nSamples * nChannels * np.dtype(nptype).itemsize
+            nSamples * nChannels * np.dtype(nptype).itemsize
         raw = Array('c', sizeBytes)
         hdr = BufferHeader.from_buffer(raw.get_obj())
 
@@ -108,16 +108,20 @@ class Buffer(object):
 
         # helper variables
         self.__nChannels = hdr.nChannels
+        self.__nSamples = hdr.nSamples
         self.__bufSize = len(self.__buf)
         self.__nptype = nptype
 
-    def __write_buffer(self, data, start, end=None):
+    def __write_buffer(self, data, start, end=None, channel=None):
         """Writes data to buffer."""
         # roll array
         # overwrite old section
         if end is None:
             end = start+data.shape[1]
-        self.__buf[:, start:end] = data
+        if channel is None:
+            self.__buf[:, start:end] = data
+        else:
+            self.__buf[channel, start:end] = data
 
     def __read_buffer(self, start, end):
         """Reads data from buffer, returning view into numpy array"""
@@ -132,18 +136,22 @@ class Buffer(object):
         data.setflags(write=not wprotect)
         return data
 
-    def put_data(self, data, start=0):
-        datashape = data.shape
-        if len(datashape) != 1:
-            if (data.shape[1] != self.nChannels):
+    def put_data(self, data, start=0, channel=None):
+        """Put data into the buffer. Either a single channel, or
+        overwrite the full array.
+        """
+        # FIXME: Detect which case to use based on the shape of the data
+        # should update the whole array at once
+        if len(data.shape) != 1:
+            if data.shape[0] != self.nChannels:
                 raise BufferError(4)
         else:
-            datashape = (len(data), 1)
-            if self.nChannels != 1:
+            data.shape = (1, len(data))
+            if channel >= self.nChannels or channel < 0:
                 raise BufferError(4)
 
-        end = start + len(data)
-        self.__write_buffer(data, start, end)
+        end = start + data.shape[1]
+        self.__write_buffer(data, start, end, channel)
 
     def check_availablility(self, start, end):
         """Checks whether the requested data samples are available.
@@ -276,8 +284,14 @@ if __name__ == '__main__':
     print buf1
     print buf2
 
-    dat = buf2.get_data(0, 4)
-    dat[0, 0] = 100
+    try:
+        dat = buf2.get_data(0, 5)
+        dat[1, 4] = 9
+    except ValueError:
+        print("Write protected view on array")
+
+    dat = buf2.get_data(0, 5, wprotect=False)
+    dat[1, 4] = 9
 
     print buf1
     print buf2
