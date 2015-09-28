@@ -8,6 +8,7 @@ import cmd
 import lib.tools
 from lib.constants import LOG_LEVEL_VERBOSE
 
+
 class DataMan(cmd.Cmd):
     """Command line tool for quick data documentation."""
 
@@ -40,6 +41,10 @@ class DataMan(cmd.Cmd):
         import lib.dirstats as ds
         ds.print_table(ds.gather(path))
 
+    def do_vis(self, path):
+        from vis import vis
+        vis.run(target='../data/2014-10-30_16-07-29')
+
     def do_exit(self, line):
         "Exit"
         return True
@@ -54,10 +59,13 @@ class DataMan(cmd.Cmd):
 if __name__ == "__main__":
     logging.addLevelName(LOG_LEVEL_VERBOSE, "VERBOSE")
     logging.basicConfig(level=logging.DEBUG,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     log = logging.getLogger(__name__)
 
     if len(sys.argv) > 1:
         DataMan().onecmd(' '.join(sys.argv[1:]))
     else:
-        DataMan().cmdloop()
+        try:
+            dm = DataMan().cmdloop()
+        except KeyboardInterrupt:
+            pass

@@ -18,35 +18,32 @@ import math
 
 from reader import read_record, read_header
 
-# Number of cols and rows in the table.
-nrows = 16
-ncols = 4
+# Dimensions of plot segment/signals
+n_rows = 16
+n_cols = 4
+n_signals = n_rows*n_cols
+n_samples = 3e4
 
-# Number of signals.
-m = nrows*ncols
+# Buffer to store all the pre-loaded signals
+buf = np.zeros((n_signals, n_samples), dtype=np.float32)
 
-# Number of samples per signal.
-# FIXME: Depends on zoom level/sampling rate?
-n = 3e4
-
-# Buffer
-buf = np.zeros((m, n), dtype=np.float32)
+# Load vertex and fragment shaders
+SHADER_PATH = os.path.join(os.path.dirname(__file__), 'shaders')
+with open(os.path.join(SHADER_PATH, 'vis.vert')) as vs:
+    VERT_SHADER = vs.read()
+with open(os.path.join(SHADER_PATH, 'vis.frag')) as fs:
+    FRAG_SHADER = fs.read()
 
 # Color of each vertex
 # TODO: make it more efficient by using a GLSL-based color map and the index.
-color = np.repeat(np.random.uniform(size=(nrows, 3), low=.1, high=.9),
-                  n*ncols, axis=0).astype(np.float32)
+color = np.repeat(np.random.uniform(size=(n_rows, 3), low=.1, high=.9),
+                  n_samples*n_cols, axis=0).astype(np.float32)
 
 # Signal 2D index of each vertex (row and col) and x-index (sample index
 # within each signal).
-index = np.c_[np.repeat(np.repeat(np.arange(ncols), nrows), n),
-              np.repeat(np.tile(np.arange(nrows), ncols), n),
-              np.tile(np.arange(n), m)].astype(np.float32)
-
-with open('shaders/vis.vert') as vs:
-    VERT_SHADER = vs.read()
-with open('shaders/vis.frag') as fs:
-    FRAG_SHADER = fs.read()
+index = np.c_[np.repeat(np.repeat(np.arange(n_cols), n_rows), n_samples),
+              np.repeat(np.tile(np.arange(n_rows), n_cols), n_samples),
+              np.tile(np.arange(n_samples), n_signals)].astype(np.float32)
 
 
 class Vis(app.Canvas):
@@ -66,8 +63,8 @@ class Vis(app.Canvas):
         self.program['a_color'] = color
         self.program['a_index'] = index
         self.program['u_scale'] = (1., 1.)
-        self.program['u_size'] = (nrows, ncols)
-        self.program['u_n'] = n
+        self.program['u_size'] = (n_rows, n_cols)
+        self.program['u_n'] = n_samples
 
         gloo.set_viewport(0, 0, *self.physical_size)
 
@@ -124,14 +121,14 @@ class Vis(app.Canvas):
         """Handle mouse drag and hover"""
         if event.is_dragging:
             trail = event.trail()
-            width = self.size[0]/ncols
-            height = self.size[1]/nrows
+            width = self.size[0]/n_cols
+            height = self.size[1]/n_rows
             dx = trail[-1][0]-trail[0][0]
             dy = trail[-1][1]-trail[0][1]
 
             if event.button == 1:
                 shift_signal = dx/width
-                shift_samples = shift_signal * n
+                shift_samples = shift_signal * n_samples
                 shift_offset = int(shift_samples/1024)
                 self.set_offset(absolute=self.drag_offset-shift_offset)
 
@@ -165,9 +162,9 @@ class Vis(app.Canvas):
         """Add some data at the end of each signal (real-time signals)."""
         # FIXME: Sample precision positions
         # FIXME: Only read in data when needed, not per frame. Duh. :D
-        for i in range(m):
-            buf[i, :n] = read_record('data/2014-10-30_16-07-29/106_CH{}.continuous'.format(i+1),
-                                     offset=self.offset)[:n]
+        for i in range(n_signals):
+            buf[i, :n_samples] = read_record(os.path.join(self.target, '106_CH{}.continuous'.format(i+1)),
+                                     offset=self.offset)[:n_samples]
         self.program['a_position'].set_data(buf)
 
         if self.running:
@@ -179,8 +176,12 @@ class Vis(app.Canvas):
         gloo.clear()
         self.program.draw('line_strip')
 
+
+def run(*args, **kwargs):
+    vis = Vis(*args, **kwargs)
+    app.run()
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    c = Vis(target='data/2014-10-30_16-07-29')
-    app.run()
+    run(target='../../data/2014-10-30_16-07-29')

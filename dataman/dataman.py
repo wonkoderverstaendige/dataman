@@ -25,16 +25,25 @@ if __name__ == "__main__":
     # sub-parsers
     subparsers = parser.add_subparsers(help='sub commands', dest='command')
 
+    # CLI
     parser_cli = subparsers.add_parser('cli', help='Interactive CLI session')
 
+    # STATS
     parser_stats = subparsers.add_parser('stats', help='Dataset statistics.')
     parser_stats.add_argument('path', help='Relative or absolute path to directory',
             default='.', nargs='?')
 
-    parser.ls = subparsers.add_parser('ls', help='Directory listing with basic stats (e.g. size)')
-    parser.ls .add_argument('path', help='Relative or absolute path to directory',
+    # LS
+    parser_ls = subparsers.add_parser('ls', help='Directory listing with basic stats (e.g. size)')
+    parser_ls .add_argument('path', help='Relative or absolute path to directory',
             default='.', nargs='?')
 
+    # VIS
+    parser_vis = subparsers.add_parser('vis', help='Launch simple visualizer on dataset')
+    parser_vis.add_argument('path', help='Relative or absolute path to directory',
+                            default='.', nargs='?')
+
+    # PROC, DOC, CHECK
     parser_proc = subparsers.add_parser('proc', help='Data processing')
     parser_doc = subparsers.add_parser('doc', help='Data documentation')
     parser_check = subparsers.add_parser('check', help='Check/verify data and documentation integrity')
@@ -52,7 +61,10 @@ if __name__ == "__main__":
     log = logging.getLogger(__name__)
 
     if cli_args is None or cli_args.command == 'cli':
-        DataMan().cmdloop()
+        try:
+            dm = DataMan().cmdloop()
+        except KeyboardInterrupt:
+            pass
     else:
         DataMan().onecmd(' '.join(sys.argv[1:]))
 
