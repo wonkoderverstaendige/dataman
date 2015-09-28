@@ -43,7 +43,7 @@ class DataMan(cmd.Cmd):
 
     def do_vis(self, path):
         from vis import vis
-        vis.run(target='../data/2014-10-30_16-07-29')
+        vis.run(target=path)
 
     def do_exit(self, line):
         "Exit"
