@@ -3,7 +3,7 @@
 #############
 
 testing/
-dataman/vis/data
+data/
 
 #############
 ## Python

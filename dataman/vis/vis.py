@@ -32,8 +32,8 @@ n = 3e4
 # Buffer
 buf = np.zeros((m, n), dtype=np.float32)
 
-# Color of each vertex (TODO: make it more efficient by using a GLSL-based
-# color map and the index).
+# Color of each vertex
+# TODO: make it more efficient by using a GLSL-based color map and the index.
 color = np.repeat(np.random.uniform(size=(nrows, 3), low=.1, high=.9),
                   n*ncols, axis=0).astype(np.float32)
 
@@ -136,7 +136,6 @@ class Vis(app.Canvas):
                 self.set_offset(absolute=self.drag_offset-shift_offset)
 
             if event.button == 2:
-                print dx/width, dy/height
                 self.set_scale(scale_x=1.0*math.exp(dx/width),
                                scale_y=1.0*math.exp(dy/height))
 
@@ -154,7 +153,6 @@ class Vis(app.Canvas):
             dx = -np.sign(event.delta[1])*int(event.delta[1]**2)
             self.set_offset(relative=dx)
         else:
-            # Zooooom
             delta = np.sign(event.delta[1]) * .05
             if util.keys.SHIFT in event.modifiers:
                 self.set_scale(factor_x=math.exp(2.5*delta))
