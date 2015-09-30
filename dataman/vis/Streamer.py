@@ -13,7 +13,7 @@ import logging
 import time
 import signal
 from multiprocessing import Process
-from reader import read_record, read_header
+from reader import read_record
 
 from Buffer import Buffer
 
@@ -62,8 +62,6 @@ class Streamer(Process):
             time.sleep(0.02)
 
         self.logger.info('Stopped streaming')
-        # cmd = self.__get_cmd()
-        # self.__execute_cmd(cmd)
 
     def stop(self):
         pass
@@ -76,11 +74,6 @@ class Streamer(Process):
             except Exception as e:
                 break
         return messages
-        # try:
-        #     cmd, data = self.q.get(False)
-        #     return cmd, data
-        # except Exception:
-        #     return None, None
 
     def __execute_cmd(self, cmd):
         if cmd in self.cmds:
@@ -91,13 +84,6 @@ class Streamer(Process):
 
 
 # ------------------------------------------------------------------------------
-logging.basicConfig(level=logging.INFO, format='[%(process)-5d:%(threadName)-10s] %(name)s: %(levelname)s: %(message)s')
-
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    # client = Client(buffer_size=300000, buffer_window=10)
-    # client.connect(('', 51244))
-    # client.start_streaming()
-    # time.sleep(10)
-    # client.stop_streaming()
-    # client.disconnect()
+    logging.basicConfig(level=logging.INFO,
+                        format='[%(process)-5d:%(threadName)-10s] %(name)s: %(levelname)s: %(message)s')

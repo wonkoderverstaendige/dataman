@@ -267,5 +267,6 @@ def run(*args, **kwargs):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                        #format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                        format='%(asctime)s [%(process)-5d:%(threadName)-10s] %(name)s: %(levelname)s: %(message)s')
     run(target='../../data/2014-10-30_16-07-29', proc_node=106)
