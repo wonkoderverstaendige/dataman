@@ -6,8 +6,10 @@ Multiple real-time digital signals with GLSL-based clipping.
 """
 
 from __future__ import division
+
 import logging
 import os
+import time
 from multiprocessing import Queue
 
 import numpy as np
@@ -20,7 +22,7 @@ from vispy import util
 from Buffer import Buffer
 from Streamer import Streamer
 
-from reader import read_record, read_header
+from reader import read_header
 
 # Load vertex and fragment shaders
 SHADER_PATH = os.path.join(os.path.dirname(__file__), 'shaders')
@@ -42,13 +44,24 @@ class Vis(app.Canvas):
                             keys='interactive')
         self.logger = logging.getLogger("Vis")
         self.running = False
+
+        # Data source
+        # TODO: Detect format (.dat, .continuous, .kwik), see dataman tools
+        # TODO: Get number of channels
+        # TODO: Get proc node of recording processor
+        self.__target = target
+        self.__target_hdr = read_header(os.path.join(self.target, '106_CH1.continuous'))
+        self.__n_samples_total = self.__target_hdr['numSamples']
+        self.__n_channels = 64
+        self.target_info()
+
         self.offset = 0
         self.drag_offset = 0
 
         # Dimensions of plot segment/signals
-        self.n_rows = 16
-        self.n_cols = 4
-        self.n_channels = self.n_rows * self.n_cols
+        self.n_cols = 1
+        self.n_rows = int(self.n_channels/self.n_cols)
+        # FIXME: n_samples should in the end refer to n_samples_total and the current depend on buffer size ans u_scale
         self.n_samples = 30000
 
         # Buffer to store all the pre-loaded signals
@@ -57,11 +70,10 @@ class Vis(app.Canvas):
         self.__buf.initialize(nChannels=self.n_channels, nSamples=self.n_samples, nptype='float32')
         # self.__buf.put_data(np.zeros((self.n_channels, self.n_samples), dtype=np.float32))
 
-        # Data source
-        self.__target = target
-        self.test_target()
+        # Streamer to keep buffer filled
         self.__streamer = None
         self.q = Queue()
+        self.start_streaming()
 
         # Color of each vertex
         # TODO: make it more efficient by using a GLSL-based color map and the index.
@@ -98,14 +110,18 @@ class Vis(app.Canvas):
             return False
 
     target = property(lambda self: self.__target, None, None,
-                      "Target directory/file to stream from")
+                      "Target directory/file to stream from, read-only (string)")
+    target_hdr = property(lambda self: self.__target_hdr, None, None,
+                          "Header read from one of the data files containing meta data, read-only (dict)")
+    n_channels = property(lambda self: self.__n_channels, None, None,
+                          "Number of channels in the data set, read-only (int)")
     is_streaming = property(__get_is_streaming, None, None,
                             'Checks whether the data source streamer is active, read-only (bool)')
     buffer_size = property(lambda self: self.__buffer_size, None, None,
                            'Buffer capacity in samples, read-only (int)')
 
     def start_streaming(self):
-        """Start streaming data of the current virtual cursor position into the shared buffer.
+        """Start streaming data into the shared buffer.
         """
         self.logger.info("Spawning streaming process...")
         self.__streamer = Streamer(target=self.target, queue=self.q, raw=self.__buf.raw)
@@ -120,24 +136,17 @@ class Vis(app.Canvas):
             raise Exception("Streamer already stopped.")
 
         self.q.put(('stop', ))
-
         self.__streamer.join()
         self.logger.info("Streamer stopped")
 
-    def test_target(self):
+    def target_info(self):
         """Check if target exists (and the format)"""
-        # FIXME: Get data format (.dat, .continuous, .kwik)
-        filename = os.path.join(self.target, '106_CH1.continuous')
-        self.logger.info("Reading file header of {}".format(filename))
-        hdr = read_header(filename)
-        fs = hdr['sampleRate']
-        n_blocks = (os.path.getsize(filename)-1024)/2070
-        n_samples = n_blocks*1024
-        self.logger.info('Fs = {}kHz, {} blocks, {:.0f} samples, {:02.0f}min:{:02.0f}s'
-                         .format(fs/1e3, n_blocks, n_samples,
-                                 math.floor(n_samples/fs / 60),
-                                 math.floor(n_samples/fs % 60)))
-        return True
+        fs = self.target_hdr['sampleRate']
+        n_blocks = self.__n_samples_total/1024
+        self.logger.info('Fs = {}kHz, {:.2f} records, {:.0f} samples, {:02.0f}min:{:02.0f}s'
+                         .format(fs/1e3, n_blocks, self.__n_samples_total,
+                                 math.floor(self.__n_samples_total/fs / 60),
+                                 math.floor(self.__n_samples_total/fs % 60)))
 
     def set_scale(self, factor_x=1.0, factor_y=1.0, scale_x=None, scale_y=None):
         """Change visualization scaling of the subplots.
@@ -157,8 +166,8 @@ class Vis(app.Canvas):
         self.offset += relative
         if self.offset < 0:
             self.offset = 0
-        elif self.offset > 1000:
-            self.offset = 1000
+        elif self.offset >= self.__n_samples_total/1024:
+            self.offset = self.__n_samples_total/1024-1
 
     def on_resize(self, event):
         """Adjust viewport when window is resized. Smoothly does everything
@@ -229,10 +238,9 @@ class Vis(app.Canvas):
         """Add some data at the end of each signal (real-time signals)."""
         # FIXME: Sample precision positions
         # FIXME: Only read in data when needed, not per frame. Duh. :D
-        if not self.is_streaming:
-            self.start_streaming()
 
-        self.q.put(('position', self.offset))
+        if self.is_streaming:
+            self.q.put(('position', self.offset))
         # TODO: Only update the buffer if necessary!
         self.program['a_position'].set_data(self.__buf.get_data(0, self.n_samples))
 
@@ -244,6 +252,10 @@ class Vis(app.Canvas):
     def on_draw(self, event):
         gloo.clear()
         self.program.draw('line_strip')
+
+    def on_close(self, event):
+        self.q.put(('stop', None))
+        time.sleep(0.1)
 
 
 def run(*args, **kwargs):

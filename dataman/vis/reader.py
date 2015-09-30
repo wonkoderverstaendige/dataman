@@ -8,6 +8,7 @@ Created on Sep 23, 2015 18:53
 File reader
 """
 
+import os
 import numpy as np
 import re
 
@@ -44,6 +45,10 @@ def read_header(filename):
         header_dict[key] = float(header_dict[key])
     for key in ['blockLength', 'bufferSize', 'header_bytes', 'channel']:
         header_dict[key] = int(header_dict[key] if not key == 'channel' else header_dict[key][2:])
+
+    # Add some additional information in there
+    header_dict['file_bytes'] = os.path.getsize(filename)
+    header_dict['numSamples'] = (header_dict['file_bytes']-SIZE_HEADER)/SIZE_RECORD*NUM_SAMPLES
 
     return header_dict
 

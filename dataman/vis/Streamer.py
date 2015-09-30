@@ -46,6 +46,7 @@ class Streamer(Process):
             messages = self.__get_cmd()
             pos_changes = [msg[1] for msg in messages if msg[0] == 'position' and msg[1] is not None]
             last_pos = pos_changes[-1] if len(pos_changes) else self.position
+            cmd = 'stop' if 'stop' in [msg[0] for msg in messages if msg[0] != 'position'] else None
 
             if last_pos is not None and self.position != last_pos:
                 self.position = last_pos
@@ -56,12 +57,12 @@ class Streamer(Process):
                 for i, f in enumerate(self.files):
                     data = read_record(f, offset=self.position)[:self.__buf.nSamples]
                     self.__buf.put_data(data, channel=i)
-                self.logger.info('Read data at position {} in {:.1f} ms'.format(self.position, (time.time()-t)*1000))
+                self.logger.debug('Read data at position {} in {:.0f} ms'.format(self.position, (time.time()-t)*1000))
             time.sleep(0.02)
 
-        self.logger('Stopped streaming')
-        cmd = self.__get_cmd()
-        self.__execute_cmd(cmd)
+        self.logger.info('Stopped streaming')
+        # cmd = self.__get_cmd()
+        # self.__execute_cmd(cmd)
 
     def stop(self):
         pass
