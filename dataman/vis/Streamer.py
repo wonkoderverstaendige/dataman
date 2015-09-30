@@ -19,7 +19,7 @@ from Buffer import Buffer
 
 
 class Streamer(Process):
-    def __init__(self, target, queue, raw):
+    def __init__(self, target, queue, raw, proc_node):
         self.logger = logging.getLogger(__name__)
         self.__buf = Buffer()
         self.__buf.initialize_from_raw(raw)
@@ -27,7 +27,8 @@ class Streamer(Process):
         self.position = None
 
         self.target = target
-        self.files = [os.path.join(self.target, '106_CH{}.continuous'.format(i+1)) for i in range(self.__buf.nChannels)]
+        self.files = [os.path.join(self.target, '{}_CH{}.continuous'.format(proc_node, i+1))
+                      for i in range(self.__buf.nChannels)]
 
         # dictionary of known commands
         self.cmds = {'stop': self.stop}

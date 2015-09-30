@@ -39,7 +39,7 @@ class Vis(app.Canvas):
     buffer_size : int, optional
         buffer capacity (in samples)
     """
-    def __init__(self, target, buffer_size=300000):
+    def __init__(self, target, buffer_size=300000, proc_node=100):
         app.Canvas.__init__(self, title='dataman Vis',
                             keys='interactive')
         self.logger = logging.getLogger("Vis")
@@ -50,7 +50,8 @@ class Vis(app.Canvas):
         # TODO: Get number of channels
         # TODO: Get proc node of recording processor
         self.__target = target
-        self.__target_hdr = read_header(os.path.join(self.target, '106_CH1.continuous'))
+        self.__target_proc_node = proc_node
+        self.__target_hdr = read_header(os.path.join(self.target, '{}_CH1.continuous'.format(proc_node)))
         self.__n_samples_total = self.__target_hdr['numSamples']
         self.__n_channels = 64
         self.target_info()
@@ -124,7 +125,8 @@ class Vis(app.Canvas):
         """Start streaming data into the shared buffer.
         """
         self.logger.info("Spawning streaming process...")
-        self.__streamer = Streamer(target=self.target, queue=self.q, raw=self.__buf.raw)
+        self.__streamer = Streamer(target=self.target, queue=self.q,
+                                   raw=self.__buf.raw, proc_node=self.__target_proc_node)
         self.__streamer._daemonic = True
         self.__streamer.start()
         self.logger.info("Streamer started")
@@ -266,4 +268,4 @@ def run(*args, **kwargs):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    run(target='../../data/2014-10-30_16-07-29')
+    run(target='../../data/2014-10-30_16-07-29', proc_node=106)
