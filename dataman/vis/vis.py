@@ -136,6 +136,7 @@ class Vis(app.Canvas):
             raise Exception("Streamer already stopped.")
 
         self.q.put(('stop', ))
+        time.sleep(0.1)
         self.__streamer.join()
         self.logger.info("Streamer stopped")
 
@@ -169,7 +170,8 @@ class Vis(app.Canvas):
         elif self.offset >= self.__n_samples_total/1024:
             self.offset = self.__n_samples_total/1024-1
 
-    def on_resize(self, event):
+    @staticmethod
+    def on_resize(event):
         """Adjust viewport when window is resized. Smoothly does everything
         needed to adjust the graphs. Awesome.
         """
@@ -211,7 +213,7 @@ class Vis(app.Canvas):
                 self.set_scale(scale_x=1.0*math.exp(dx/width),
                                scale_y=1.0*math.exp(dy/height))
 
-    def on_mouse_press(self, event):
+    def on_mouse_press(self, _):
         self.drag_offset = self.offset
 
     def on_mouse_wheel(self, event):
@@ -234,7 +236,7 @@ class Vis(app.Canvas):
 
         self.update()
 
-    def on_timer(self, event):
+    def on_timer(self, _):
         """Add some data at the end of each signal (real-time signals)."""
         # FIXME: Sample precision positions
         # FIXME: Only read in data when needed, not per frame. Duh. :D
@@ -249,13 +251,12 @@ class Vis(app.Canvas):
 
         self.update()
 
-    def on_draw(self, event):
+    def on_draw(self, _):
         gloo.clear()
         self.program.draw('line_strip')
 
-    def on_close(self, event):
-        self.q.put(('stop', None))
-        time.sleep(0.1)
+    def on_close(self, _):
+        self.stop_streaming()
 
 
 def run(*args, **kwargs):
