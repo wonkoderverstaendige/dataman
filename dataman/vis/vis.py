@@ -17,7 +17,7 @@ import math
 
 from vispy import gloo
 from vispy import app
-from vispy import util
+from vispy.util import keys
 
 from Buffer import Buffer
 from Streamer import Streamer
@@ -180,14 +180,14 @@ class Vis(app.Canvas):
     def on_key_press(self, event):
         """Keyboard handling."""
         # print event.key
-        if event.key == 'Space':
+        if event.key == keys.SPACE:
             self.running = not self.running
         elif event.key == 'Q':
             self.close()
-        elif event.key == 'Left':
+        elif event.key == keys.LEFT:
             self.offset -= 2
             self.running = False
-        elif event.key == 'Right':
+        elif event.key == keys.RIGHT:
             self.offset += 2
             self.running = False
 
@@ -229,9 +229,9 @@ class Vis(app.Canvas):
             self.running = False
         else:
             delta = np.sign(event.delta[1]) * .05
-            if util.keys.SHIFT in event.modifiers:
+            if keys.SHIFT in event.modifiers:
                 self.set_scale(factor_x=math.exp(2.5*delta))
-            elif util.keys.CONTROL in event.modifiers:
+            elif keys.CONTROL in event.modifiers:
                 self.set_scale(factor_y=math.exp(2.5*delta))
 
         self.update()
