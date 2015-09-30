@@ -19,6 +19,8 @@ table_hdr = "{:^28}{sep}{:^6}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:>3}{
 "Folder name", "size", "#fil", "#vid", "#img", "#snd", '#doc', "format", sep=" ")
 
 _row = "{0:<28}{1}{2:>4}{3:>4}{4:>4}{5:>4}{6:>10}"
+getch = tools.find_getch()
+
 
 def contains_dataset(root, dirs=None, files=None):
     """Check if directory or list of files contains a dataset of known format (OE, Kwik, etc.)"""
@@ -33,6 +35,7 @@ def contains_dataset(root, dirs=None, files=None):
     else:
         return None
 
+
 def dir_details(path):
     root, dirs, files = dir_content(path)
 
@@ -46,8 +49,9 @@ def dir_details(path):
     data_fmt = contains_dataset(path)
 
     return dict(fname=name, size=size, num_files=num_files, num_vid=num_vid,
-            num_img=num_img, num_snd=num_snd, num_doc=num_doc,
-            data_fmt=data_fmt)
+                num_img=num_img, num_snd=num_snd, num_doc=num_doc,
+                data_fmt=data_fmt)
+
 
 def gather(path):
     """Gather details on the path and its subdirectories.
@@ -62,18 +66,19 @@ def gather(path):
     """
     root, dirs, files = dir_content(path) 
 
-    details = []
-    details.append(dir_details(root))
+    details = [dir_details(root)]
     for d in dirs:
         details.append(dir_details(os.path.join(root, d)))
     return details
-        
+
+
 def prettify(element, color=None, align='>', width=0, sepl='', sepr=''):
     text = "{:{align}{width}}".format(element, align=align, width=width)
     if color:
         return sepl + colored(text, color) + sepr
     else:
         return sepl+text+sepr
+
 
 def fit_str(string, max_len=10, weight=0.7):
     if len(string) < max_len or max_len < 4:
@@ -84,17 +89,18 @@ def fit_str(string, max_len=10, weight=0.7):
     tail = int((max_len-len(indicator))*weight)
     return string[:head]+indicator+string[-tail:]
 
+
 def mk_row(row, colorized=True, cols=['fname', 'size', 'num_files',
-                                         'num_vid', 'num_img', 'num_snd', 'num_doc',
-                                         'data_fmt'], sepr='|'):
+                                      'num_vid', 'num_img', 'num_snd', 'num_doc',
+                                      'data_fmt'], sepr='|'):
+    # FIXME: List in default parameters mutable!!!
     row_str = ''
     for c in cols:
         if c == 'fname':
             row_str += prettify(fit_str(row[c], 28), sepr=sepr, align='<', width='28')
         elif c == 'size':
             row_str += prettify(tools.fmt_size(row[c], unit='', sep='', col=True, pad=7),
-
-                    sepr=sepr, align='>', width='')
+                                sepr=sepr, align='>', width='')
 
         elif c == 'num_files':
             row_str += prettify(row[c], 
@@ -129,7 +135,6 @@ def mk_row(row, colorized=True, cols=['fname', 'size', 'num_files',
     return row_str
 
 
-getch = tools._find_getch()
 def print_table(rows, color=True, page_size=-1):
     termh, termw = tools.terminal_size()
     if page_size is not None and page_size < 1:

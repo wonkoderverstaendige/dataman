@@ -7,6 +7,9 @@ from os.path import join, getsize
 from termcolor import colored
 import re
 
+ansi_escape = re.compile(r'\x1b[^m]*m')
+
+
 def fmt_size(num, unit='B', si=True, sep=' ', col=False, pad=0):
     colors = {"k": "blue", "M": "green", "G": "red", "T": "cyan",
               "Ki": "blue", "Mi": "green", "Gi": "red", "Ti": "cyan"}
@@ -25,6 +28,7 @@ def fmt_size(num, unit='B', si=True, sep=' ', col=False, pad=0):
                 return "{:5.0f}{}{}{} ".format(num, sep, prefix, unit, pad=pad-6)
         num /= divisor
 
+
 def fext(fname):
     """Grabs the file extension of a file.
 
@@ -39,6 +43,7 @@ def fext(fname):
     """
     return os.path.splitext(fname)[1]
 
+
 def dir_content(path):
     """Gathers root and first level content of a directory.
 
@@ -52,6 +57,7 @@ def dir_content(path):
         (dirpath, dirnames, filenames)
     """ 
     return next(os.walk(path))
+
 
 def dir_size(path):
     """Calculate size of directory including all subdirectories and files
@@ -73,6 +79,7 @@ def dir_size(path):
                 pass
     return total_size
 
+
 def terminal_size():
     """Get size of currently used terminal. In many cases this is inaccruate.
 
@@ -84,7 +91,8 @@ def terminal_size():
     """
     return map(int, os.popen('stty size', 'r').read().split())
 
-def _find_getch():
+
+def find_getch():
     """Helper to wait for a single character press, instead of having to use raw_input() requiring Enter
     to be pressed. Should work on all OS.
 
@@ -99,7 +107,9 @@ def _find_getch():
         return msvcrt.getch
 
     # POSIX system. Create and return a getch that manipulates the tty.
-    import sys, tty
+    import sys
+    import tty
+
     def _getch():
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
@@ -112,7 +122,7 @@ def _find_getch():
 
     return _getch
 
-ansi_escape = re.compile(r'\x1b[^m]*m')
+
 def strip_ansi(string):
     """Remove the ANSI codes (e.g. color and additional formatting) from a string.
 
