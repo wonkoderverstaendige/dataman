@@ -68,7 +68,7 @@ class Vis(app.Canvas):
         # Buffer to store all the pre-loaded signals
         self.__buffer_size = buffer_size
         self.__buf = Buffer()
-        self.__buf.initialize(nChannels=self.n_channels, nSamples=self.n_samples, nptype='float32')
+        self.__buf.initialize(n_channels=self.n_channels, buf_size_samples=self.n_samples, np_type='float32')
         # self.__buf.put_data(np.zeros((self.n_channels, self.n_samples), dtype=np.float32))
 
         # Streamer to keep buffer filled
@@ -239,15 +239,14 @@ class Vis(app.Canvas):
         self.update()
 
     def on_timer(self, _):
-        """Add some data at the end of each signal (real-time signals)."""
-        # FIXME: Sample precision positions
-        # FIXME: Only read in data when needed, not per frame. Duh. :D
-
+        """Update offset, move data from source buffer into GPU"""
         if self.is_streaming:
             self.q.put(('position', self.offset))
-        # TODO: Only update the buffer if necessary!
+
+        # TODO: Only update the GPU buffer if necessary, have shader shift vertices, too
         self.program['a_position'].set_data(self.__buf.get_data(0, self.n_samples))
 
+        # TODO: Shift by delta-frame time * Fs
         if self.running:
             self.set_offset(relative=1)
 
@@ -256,6 +255,7 @@ class Vis(app.Canvas):
     def on_draw(self, _):
         gloo.clear()
         self.program.draw('line_strip')
+        #print(self.offset)
 
     def on_close(self, _):
         self.stop_streaming()
@@ -266,7 +266,7 @@ def run(*args, **kwargs):
     app.run()
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO,
+    logging.basicConfig(level=logging.DEBUG,
                         #format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
                         format='%(asctime)s [%(process)-5d:%(threadName)-10s] %(name)s: %(levelname)s: %(message)s')
     run(target='../../data/2014-10-30_16-07-29', proc_node=106)

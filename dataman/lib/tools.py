@@ -2,12 +2,28 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
-import os
-from os.path import join, getsize
-from termcolor import colored
+from __future__ import division
 import re
+import os
+import datetime
+from termcolor import colored
+
 
 ansi_escape = re.compile(r'\x1b[^m]*m')
+
+
+def sample_to_time(sample, sampling_rate):
+    return sample/sampling_rate
+
+
+def fmt_seconds(seconds):
+    """Format seconds as a timestamp in HH:MM:SS.uuu format.
+    Parameters:
+        seconds : float
+    """
+    seconds, milliseconds = divmod(seconds, 1.)
+    td = datetime.timedelta(seconds=seconds)
+    return '{:0>8}.{:.3f}'.format(td, milliseconds)
 
 
 def fmt_size(num, unit='B', si=True, sep=' ', col=False, pad=0):
