@@ -262,7 +262,8 @@ class Vis(app.Canvas):
 
 
 def run(*args, **kwargs):
-    Vis(*args, **kwargs)
+    v1 = Vis(*args, **kwargs)
+    v2 = Vis(*args, **kwargs)
     app.run()
 
 if __name__ == '__main__':

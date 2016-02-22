@@ -19,7 +19,7 @@ from reader import read_record, read_header
 from Buffer import Buffer
 
 
-# copy from lib.tools
+# copy from lib.tools, I don't grok relative imports :(
 def fmt_seconds(seconds):
     """Format seconds as a timestamp in HH:MM:SS.uuu format.
     Parameters:
