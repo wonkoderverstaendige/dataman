@@ -6,16 +6,17 @@ except ImportError:
 config = {
         'description': 'Data Manager',
         'author': 'Ronny Eichler',
-        'url': '',
-        'download_url': '',
-        'author_email': 'ronny.eichler@gmail.com',
-        'version': '0.0.1',
+        'author_email': 'reichler@science.ru.nl',
+        'version': '0.0.2dev',
         'install_requires': ['nose', 'termcolor', 'numpy', 'vispy'],
+        'extra-requires': {'vis': 'PyQt4'},
         'packages': ['dataman'],
-        'scripts': [],
-        'name': 'dataman'
+        'name': 'dataman',
+        'entry_points': """
+            [console_scripts]
+            dm=dataman.__main__:main
+        """
         }
 
 setup(**config)
 
-        

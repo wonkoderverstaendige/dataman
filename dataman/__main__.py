@@ -1,25 +1,26 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
-from __future__ import print_function
+#
+# from __future__ import print_function
 import sys
-import cmd
 import logging
 
-from lib.constants import LOG_LEVEL_VERBOSE
-import lib.tools
-from dataman_cli import DataMan
+from dataman.lib.constants import LOG_LEVEL_VERBOSE
+# import dataman.lib.tools as tools
+from dataman.cli import DataMan
 
-__version__ = 0.01
+__version__ = '0.02dev'
 
 NO_EXIT_CONFIRMATION = True
 LOG_LEVEL = logging.INFO
-if __name__ == "__main__":
+
+def main():
     # Command line parsing
     import argparse
+
     parser = argparse.ArgumentParser(prog="DataMan")
     parser.add_argument('-d', '--debug', action='store_true',
-            help='Debug mode -- verbose output, no confirmations.')
+                        help='Debug mode -- verbose output, no confirmations.')
     parser.add_argument('--version', action='version', version='%(prog)s {version}'.format(version=__version__))
 
     # sub-parsers
@@ -31,12 +32,12 @@ if __name__ == "__main__":
     # STATS
     parser_stats = subparsers.add_parser('stats', help='Dataset statistics.')
     parser_stats.add_argument('path', help='Relative or absolute path to directory',
-            default='.', nargs='?')
+                              default='.', nargs='?')
 
     # LS
     parser_ls = subparsers.add_parser('ls', help='Directory listing with basic stats (e.g. size)')
-    parser_ls .add_argument('path', help='Relative or absolute path to directory',
-            default='.', nargs='?')
+    parser_ls.add_argument('path', help='Relative or absolute path to directory',
+                           default='.', nargs='?')
 
     # VIS
     parser_vis = subparsers.add_parser('vis', help='Launch simple visualizer on dataset')
@@ -57,7 +58,7 @@ if __name__ == "__main__":
     log_level = LOG_LEVEL_VERBOSE if cli_args is not None and cli_args.debug else LOG_LEVEL
     logging.addLevelName(LOG_LEVEL_VERBOSE, "VERBOSE")
     logging.basicConfig(level=log_level,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     log = logging.getLogger(__name__)
 
     if cli_args is None or cli_args.command == 'cli':
@@ -67,4 +68,8 @@ if __name__ == "__main__":
             pass
     else:
         DataMan().onecmd(' '.join(sys.argv[1:]))
+
+
+if __name__ == "__main__":
+    main()
 

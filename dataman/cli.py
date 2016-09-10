@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
+# from __future__ import print_function
 import sys
 import logging
 import cmd
-import lib.tools
-from lib.constants import LOG_LEVEL_VERBOSE
+import dataman.lib.tools
+from dataman.lib.constants import LOG_LEVEL_VERBOSE
 
 
 class DataMan(cmd.Cmd):
@@ -32,35 +32,37 @@ class DataMan(cmd.Cmd):
     def do_ls(self, path):
         if not len(path):
             path = '.'
-        import lib.dirstats as ds
+        import dataman.lib.dirstats as ds
         ds.print_table(ds.gather(path))
 
     def do_stats(self, path):
         if not len(path):
             path = '.'
-        import lib.dirstats as ds
+        import dataman.lib.dirstats as ds
         ds.print_table(ds.gather(path))
 
     def do_vis(self, path):
-        from vis import vis
+        from dataman.vis import vis
         vis.run(target=path)
 
     def do_exit(self, line):
-        "Exit"
+        """Exit"""
         return True
 
     def do_EOF(self, line):
-        "Exit"
+        """Exit"""
         return True
 
     def postloop(self):
         print("Done.")
 
-if __name__ == "__main__":
+
+def main():
+    main()
     logging.addLevelName(LOG_LEVEL_VERBOSE, "VERBOSE")
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    log = logging.getLogger(__name__)
+    # log = logging.getLogger(__name__)
 
     if len(sys.argv) > 1:
         DataMan().onecmd(' '.join(sys.argv[1:]))
@@ -69,3 +71,19 @@ if __name__ == "__main__":
             dm = DataMan().cmdloop()
         except KeyboardInterrupt:
             pass
+
+
+if __name__ == "__main__":
+    main()
+    # logging.addLevelName(LOG_LEVEL_VERBOSE, "VERBOSE")
+    # logging.basicConfig(level=logging.DEBUG,
+    #                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # log = logging.getLogger(__name__)
+    #
+    # if len(sys.argv) > 1:
+    #     DataMan().onecmd(' '.join(sys.argv[1:]))
+    # else:
+    #     try:
+    #         dm = DataMan().cmdloop()
+    #     except KeyboardInterrupt:
+    #         pass
