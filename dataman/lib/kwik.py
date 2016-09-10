@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
+# from __future__ import print_function
 import os
 import xml.etree.ElementTree as etree
-from tools import fext, dir_content
+from dataman.lib.tools import fext, dir_content
+
 
 def detect(root, dirs=None, files=None):
     for f in files:
@@ -14,6 +15,7 @@ def detect(root, dirs=None, files=None):
 
     else:
         return False
+
 
 def format_version(root, dirs=None, files=None):
     if dirs is None or files is None:

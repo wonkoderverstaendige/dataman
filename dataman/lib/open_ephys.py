@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
+# from __future__ import print_function
 import os
 import xml.etree.ElementTree as etree
-from tools import fext, dir_content
+from dataman.lib.tools import fext, dir_content
+
 
 def detect(root=None, dirs=None, files=None):
     """Checks for existence of an open ephys formatted data set in the root directory.
@@ -27,6 +28,7 @@ def detect(root=None, dirs=None, files=None):
             return "OE_v{}".format(fv if fv else '???')
     else:
         return False
+
 
 def format_version(root, dirs=None, files=None):
     if dirs is None or files is None:

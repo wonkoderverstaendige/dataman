@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
-import tools
-from tools import fext, dir_content
+import dataman.lib.tools as tools
+from dataman.lib.tools import fext, dir_content
 import os
 import sys
 from termcolor import colored
-import open_ephys
-import kwik
+import dataman.lib.open_ephys as open_ephys
+import dataman.lib.kwik as kwik
 
 EXT_VIDEO = ['.avi', '.mp4', '.mkv', '.wmv']
 EXT_SOUND = ['.wav', '.mp3', '.snd', '.wma']
