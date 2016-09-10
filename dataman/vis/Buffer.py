@@ -21,7 +21,7 @@ import numpy as np
 
 class Buffer(object):
     """
-    One-dimensional buffer with homogenous elements.
+    One-dimensional buffer with homogeneous elements.
 
     The buffer can be used simultaneously by multiple processes, because
     both data and metadata are stored in a single sharedctypes byte array.
@@ -99,7 +99,7 @@ class Buffer(object):
         nptype = datatypes.get_type(hdr.dataType)
 
         bufOffset = c.sizeof(hdr)
-        bufFlatSize = hdr.bufSizeBytes / np.dtype(nptype).itemsize
+        bufFlatSize = hdr.bufSizeBytes // np.dtype(nptype).itemsize
 
         # create numpy view object pointing to the raw array
         self.__raw = raw
@@ -197,6 +197,7 @@ class datatypes():
     """
     types = {0: 'float32',
              1: 'int16'}
+    types_rev = {v: k for k, v in types.items()}
 
     @classmethod
     def get_code(cls, ndtype):
@@ -207,8 +208,7 @@ class datatypes():
         ndtype : string
             numpy datatype (e.g. 'float32')
         """
-        idx = cls.types.values().index(ndtype)
-        return cls.types.keys()[idx]
+        return cls.types_rev[ndtype]
 
     @classmethod
     def get_type(cls, code):
@@ -283,8 +283,8 @@ if __name__ == '__main__':
     buf1.put_data(np.array([[1, 2], [3, 4]]))
     buf2.put_data(np.array([[5, 6], [7, 8]]), start=2)
 
-    print buf1
-    print buf2
+    print(buf1)
+    print(buf2)
 
     try:
         dat = buf2.get_data(0, 5)
@@ -295,5 +295,5 @@ if __name__ == '__main__':
     dat = buf2.get_data(0, 5, wprotect=False)
     dat[1, 4] = 9
 
-    print buf1
-    print buf2
+    print(buf1)
+    print(buf2)

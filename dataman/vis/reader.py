@@ -85,8 +85,8 @@ def read_record(filename, offset=0, count=30, dtype=DATA_DT):
 
 
 if __name__ == "__main__":
-    print read_header('data/2014-10-30_16-07-29/106_CH1.continuous')
-    print read_segment('data/2014-10-30_16-07-29/106_CH1.continuous', offset=SIZE_HEADER)['samples'].ravel()[0]
+    print(read_header('data/2014-10-30_16-07-29/106_CH1.continuous'))
+    print(read_segment('data/2014-10-30_16-07-29/106_CH1.continuous', offset=SIZE_HEADER)['samples'].ravel()[0])
 
 
 

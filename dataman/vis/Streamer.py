@@ -13,9 +13,9 @@ import logging
 import time
 import signal
 from multiprocessing import Process
-from reader import read_record, read_header
+from dataman.vis.reader import read_record, read_header
 
-from Buffer import Buffer
+from dataman.vis.Buffer import Buffer
 
 
 class Streamer(Process):

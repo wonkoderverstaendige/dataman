@@ -9,6 +9,7 @@ from __future__ import division
 
 import logging
 import os
+import os.path as op
 import time
 from multiprocessing import Queue
 
@@ -19,10 +20,10 @@ from vispy import gloo
 from vispy import app
 from vispy.util import keys
 
-from Buffer import Buffer
-from Streamer import Streamer
+from dataman.vis.Buffer import Buffer
+from dataman.vis.Streamer import Streamer
 
-from reader import read_header
+from dataman.vis.reader import read_header
 
 # Load vertex and fragment shaders
 SHADER_PATH = os.path.join(os.path.dirname(__file__), 'shaders')
@@ -40,8 +41,7 @@ class Vis(app.Canvas):
         buffer capacity (in samples)
     """
     def __init__(self, target, buffer_size=300000):
-        app.Canvas.__init__(self, title='dataman Vis',
-                            keys='interactive')
+        app.Canvas.__init__(self, title='dataman Vis', keys='interactive')
         self.logger = logging.getLogger("Vis")
         self.running = False
 
@@ -49,8 +49,8 @@ class Vis(app.Canvas):
         # TODO: Detect format (.dat, .continuous, .kwik), see dataman tools
         # TODO: Get number of channels
         # TODO: Get proc node of recording processor
-        self.__target = target
-        self.__target_hdr = read_header(os.path.join(self.target, '106_CH1.continuous'))
+        self.__target = op.abspath(op.expanduser(target))
+        self.__target_hdr = read_header(op.join(self.target, '106_CH1.continuous'))
         self.__n_samples_total = self.__target_hdr['numSamples']
         self.__n_channels = 64
         self.target_info()
@@ -59,7 +59,7 @@ class Vis(app.Canvas):
         self.drag_offset = 0
 
         # Dimensions of plot segment/signals
-        self.n_cols = 1
+        self.n_cols = 4
         self.n_rows = int(self.n_channels/self.n_cols)
         # FIXME: n_samples should in the end refer to n_samples_total and the current depend on buffer size ans u_scale
         self.n_samples = 30000
