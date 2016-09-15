@@ -13,7 +13,7 @@ import logging
 import time
 import signal
 from multiprocessing import Process
-from dataman.vis.reader import read_record, read_header
+from dataman.vis.reader import read_record
 
 from dataman.vis.Buffer import Buffer
 

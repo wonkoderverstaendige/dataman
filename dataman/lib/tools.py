@@ -81,7 +81,7 @@ def dir_size(path):
 
 
 def terminal_size():
-    """Get size of currently used terminal. In many cases this is inaccruate.
+    """Get size of currently used terminal. In many cases this is inaccurate.
 
     Returns:
         Tuple of width, height.

@@ -3,7 +3,7 @@
 
 # from __future__ import print_function
 import os
-import xml.etree.ElementTree as etree
+from xml.etree import ElementTree
 from dataman.lib.tools import fext, dir_content
 
 
@@ -20,7 +20,7 @@ def detect(root=None, dirs=None, files=None):
     """
     # TODO: Make all three optional and work with either
     if dirs is None or files is None:
-       _, dirs, files = dir_content(root)
+        _, dirs, files = dir_content(root)
 
     for f in files:
         if fext(f) in ['.continuous']:
@@ -34,11 +34,8 @@ def format_version(root, dirs=None, files=None):
     if dirs is None or files is None:
         _, dirs, files = dir_content(root)
     if "settings.xml" in files:
-        root = etree.parse(os.path.join(root, 'settings.xml'))
+        root = ElementTree.parse(os.path.join(root, 'settings.xml'))
         version = root.findall("INFO/VERSION")
-        if not len(version):
-            return None
-        else:
-            return version[0].text
+        return version[0].text if len(version) else None
     else:
         return None

@@ -61,7 +61,7 @@ class Vis(app.Canvas):
         # Dimensions of plot segment/signals
         self.n_cols = 4
         self.n_rows = int(self.n_channels/self.n_cols)
-        # FIXME: n_samples should in the end refer to n_samples_total and the current depend on buffer size ans u_scale
+        # FIXME: n_samples should in the end refer to n_samples_total and the current depend on buffer size and u_scale
         self.n_samples = 30000
 
         # Buffer to store all the pre-loaded signals
@@ -200,7 +200,7 @@ class Vis(app.Canvas):
             dx = trail[-1][0]-trail[0][0]
             dy = trail[-1][1]-trail[0][1]
 
-            # drag signals
+            # drag signals with left mouse button
             if event.button == 1:
                 shift_signal = dx/width
                 shift_samples = shift_signal * self.n_samples
@@ -208,7 +208,7 @@ class Vis(app.Canvas):
                 self.set_offset(absolute=self.drag_offset-shift_offset)
                 self.running = False
 
-            # change scaling
+            # change scaling with right mouse button
             if event.button == 2:
                 self.set_scale(scale_x=1.0*math.exp(dx/width),
                                scale_y=1.0*math.exp(dy/height))
@@ -223,9 +223,10 @@ class Vis(app.Canvas):
         Shift+MW: x-axis scale (time scale),
         Ctrl+MW:  y-axis scale (amplitude)
         """
+        # TODO: Offset change depending on x-axis scale
         if not len(event.modifiers):
             dx = -np.sign(event.delta[1])*int(event.delta[1]**2)
-            self.set_offset(relative=dx*5)
+            self.set_offset(relative=int(dx*5))
             self.running = False
         else:
             delta = np.sign(event.delta[1]) * .05
