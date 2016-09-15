@@ -1,22 +1,18 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-# from __future__ import print_function
-import sys
-import logging
 import cmd
-import dataman.lib.tools
-from dataman.lib.constants import LOG_LEVEL_VERBOSE
+import logging
 
 
-class DataMan(cmd.Cmd):
+class DataManCLI(cmd.Cmd):
     """Command line tool for quick data documentation."""
 
     prompt = "dm> "
     intro = "Data Manager\n --Ronny's way of avoiding having to stare at spreadsheets."
 
-    def preloop(self):
+    def __init__(self, completekey='tab', stdin=None, stdout=None):
+        super().__init__(completekey='tab', stdin=None, stdout=None)
         self.log = logging.getLogger(__name__)
+
+    def preloop(self):
         self.log.debug("starting DataMan CLI")
         # process command line arguments etc.
 
@@ -55,35 +51,3 @@ class DataMan(cmd.Cmd):
 
     def postloop(self):
         print("Done.")
-
-
-def main():
-    main()
-    logging.addLevelName(LOG_LEVEL_VERBOSE, "VERBOSE")
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    # log = logging.getLogger(__name__)
-
-    if len(sys.argv) > 1:
-        DataMan().onecmd(' '.join(sys.argv[1:]))
-    else:
-        try:
-            dm = DataMan().cmdloop()
-        except KeyboardInterrupt:
-            pass
-
-
-if __name__ == "__main__":
-    main()
-    # logging.addLevelName(LOG_LEVEL_VERBOSE, "VERBOSE")
-    # logging.basicConfig(level=logging.DEBUG,
-    #                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    # log = logging.getLogger(__name__)
-    #
-    # if len(sys.argv) > 1:
-    #     DataMan().onecmd(' '.join(sys.argv[1:]))
-    # else:
-    #     try:
-    #         dm = DataMan().cmdloop()
-    #     except KeyboardInterrupt:
-    #         pass

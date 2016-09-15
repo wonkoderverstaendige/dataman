@@ -1,18 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#
-# from __future__ import print_function
-import sys
-import logging
 
+import logging
+import sys
+
+from dataman.cli.cli import DataManCLI
 from dataman.lib.constants import LOG_LEVEL_VERBOSE
-# import dataman.lib.tools as tools
-from dataman.cli import DataMan
 
 __version__ = '0.02dev'
 
 NO_EXIT_CONFIRMATION = True
-LOG_LEVEL = logging.INFO
+DEFAULT_LOG_LEVEL = logging.INFO
+
 
 def main():
     # Command line parsing
@@ -49,25 +48,21 @@ def main():
     parser_doc = subparsers.add_parser('doc', help='Data documentation')
     parser_check = subparsers.add_parser('check', help='Check/verify data and documentation integrity')
 
-    cli_args = None
-    if len(sys.argv) > 1:
-        cli_args = parser.parse_args()
-        if cli_args.debug:
-            NO_EXIT_CONFIRMATION = True
+    cli_args = parser.parse_args()
 
-    log_level = LOG_LEVEL_VERBOSE if cli_args is not None and cli_args.debug else LOG_LEVEL
+    log_level = LOG_LEVEL_VERBOSE if cli_args is not None and cli_args.debug else DEFAULT_LOG_LEVEL
     logging.addLevelName(LOG_LEVEL_VERBOSE, "VERBOSE")
     logging.basicConfig(level=log_level,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     log = logging.getLogger(__name__)
 
-    if cli_args is None or cli_args.command == 'cli':
+    if cli_args.command in [None, 'cli']:
         try:
-            dm = DataMan().cmdloop()
+            DataManCLI().cmdloop()
         except KeyboardInterrupt:
             pass
     else:
-        DataMan().onecmd(' '.join(sys.argv[1:]))
+        DataManCLI().onecmd(' '.join(sys.argv[1:]))
 
 
 if __name__ == "__main__":
