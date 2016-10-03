@@ -14,7 +14,7 @@ import time
 import signal
 import datetime
 from multiprocessing import Process
-from dataman.vis.reader import read_record
+from dataman.vis.reader import read_record, read_header
 
 from dataman.vis.Buffer import Buffer
 
@@ -28,7 +28,7 @@ def fmt_seconds(seconds):
     seconds, milliseconds = divmod(seconds, 1.)
     td_s = datetime.timedelta(seconds=seconds)
     td_ms = '{:.3f}'.format(milliseconds).lstrip('0')
-    return '{:0>8}{}'.format(td_s, td_ms)
+    return '{}{}'.format(td_s, td_ms)  # :0>8
 
 
 class Streamer(Process):
@@ -41,7 +41,7 @@ class Streamer(Process):
     buffer_size : int, optional
         buffer capacity (in samples)
     """
-    def __init__(self, target, queue, raw, proc_node):
+    def __init__(self, target, queue, raw, proc_node=106):
         self.logger = logging.getLogger(__name__)
         self.__buf = Buffer()
         self.__buf.initialize_from_raw(raw)
@@ -51,7 +51,7 @@ class Streamer(Process):
         # TODO: target as class, with information about type, mapping, internal/external clocking
         self.target = target
         # TODO: Take channel map in the .prb file into account
-        channel_list = xrange(self.__buf.n_channels)
+        channel_list = range(self.__buf.nChannels)
         self.files = [(channel, os.path.join(self.target, '{}_CH{}.continuous'.format(proc_node, channel+1)))
                       for channel in channel_list]
         self.target_header = read_header(self.files[0][1])
@@ -84,10 +84,10 @@ class Streamer(Process):
                 # TODO: Avoid extra copy of data by having Buffer return view on array and write in place
                 t = time.time()
                 for sf in self.files:
-                    data = read_record(sf[1], offset=self.position)[:self.__buf.buf_samples]
-                    self.__buf.put_channel_data(data, channel=sf[0])
+                    data = read_record(sf[1], offset=self.position)[:self.__buf.nSamples]
+                    self.__buf.put_data(data, channel=sf[0])
                 self.logger.debug('Read {} channel data at position {} in {:.0f} ms'.
-                                  format(self.__buf.n_channels,
+                                  format(self.__buf.nChannels,
                                          fmt_seconds(self.position*1024/self.target_header['sampleRate']),
                                          (time.time()-t)*1000))
             time.sleep(0.02)
@@ -112,9 +112,3 @@ class Streamer(Process):
                 self.cmds[cmd]()
             except:
                 self.logger.warning('unable to execute command {}'.format(cmd))
-
-
-# ------------------------------------------------------------------------------
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO,
-                        format='[%(process)-5d:%(threadName)-10s] %(name)s: %(levelname)s: %(message)s')
