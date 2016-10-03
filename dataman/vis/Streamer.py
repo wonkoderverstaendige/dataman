@@ -12,22 +12,49 @@ import os
 import logging
 import time
 import signal
+import datetime
 from multiprocessing import Process
 from dataman.vis.reader import read_record
 
 from dataman.vis.Buffer import Buffer
 
 
+# copy from lib.tools, I don't grok relative imports :(
+def fmt_seconds(seconds):
+    """Format seconds as a timestamp in HH:MM:SS.uuu format.
+    Parameters:
+        seconds : float
+    """
+    seconds, milliseconds = divmod(seconds, 1.)
+    td_s = datetime.timedelta(seconds=seconds)
+    td_ms = '{:.3f}'.format(milliseconds).lstrip('0')
+    return '{:0>8}{}'.format(td_s, td_ms)
+
+
 class Streamer(Process):
-    def __init__(self, target, queue, raw):
+    """Process to stream data from file source.
+
+    Controlled via commands submitted to a queue and read data
+    is placed in a buffer shared with parent process.
+
+    ----------
+    buffer_size : int, optional
+        buffer capacity (in samples)
+    """
+    def __init__(self, target, queue, raw, proc_node):
         self.logger = logging.getLogger(__name__)
         self.__buf = Buffer()
         self.__buf.initialize_from_raw(raw)
-        self.q = queue
+        self.q = queue  # Queue receives tuple of (command (string), data) or (command, None)
         self.position = None
 
+        # TODO: target as class, with information about type, mapping, internal/external clocking
         self.target = target
-        self.files = [os.path.join(self.target, '106_CH{}.continuous'.format(i+1)) for i in range(self.__buf.nChannels)]
+        # TODO: Take channel map in the .prb file into account
+        channel_list = xrange(self.__buf.n_channels)
+        self.files = [(channel, os.path.join(self.target, '{}_CH{}.continuous'.format(proc_node, channel+1)))
+                      for channel in channel_list]
+        self.target_header = read_header(self.files[0][1])
 
         # dictionary of known commands
         self.cmds = {'stop': self.stop}
@@ -43,6 +70,7 @@ class Streamer(Process):
         signal.signal(signal.SIGINT, signal.SIG_IGN)
 
         while cmd != 'stop':
+            # Grab all messages currently in the queue
             messages = self.__get_cmd()
             pos_changes = [msg[1] for msg in messages if msg[0] == 'position' and msg[1] is not None]
             last_pos = pos_changes[-1] if len(pos_changes) else self.position
@@ -53,16 +81,18 @@ class Streamer(Process):
 
                 # READ IN DATA
                 # TODO: Here be worker pool of threads/processes grabbing data into the shared buffer
+                # TODO: Avoid extra copy of data by having Buffer return view on array and write in place
                 t = time.time()
-                for i, f in enumerate(self.files):
-                    data = read_record(f, offset=self.position)[:self.__buf.nSamples]
-                    self.__buf.put_data(data, channel=i)
-                self.logger.debug('Read data at position {} in {:.0f} ms'.format(self.position, (time.time()-t)*1000))
+                for sf in self.files:
+                    data = read_record(sf[1], offset=self.position)[:self.__buf.buf_samples]
+                    self.__buf.put_channel_data(data, channel=sf[0])
+                self.logger.debug('Read {} channel data at position {} in {:.0f} ms'.
+                                  format(self.__buf.n_channels,
+                                         fmt_seconds(self.position*1024/self.target_header['sampleRate']),
+                                         (time.time()-t)*1000))
             time.sleep(0.02)
 
         self.logger.info('Stopped streaming')
-        # cmd = self.__get_cmd()
-        # self.__execute_cmd(cmd)
 
     def stop(self):
         pass
@@ -75,11 +105,6 @@ class Streamer(Process):
             except Exception as e:
                 break
         return messages
-        # try:
-        #     cmd, data = self.q.get(False)
-        #     return cmd, data
-        # except Exception:
-        #     return None, None
 
     def __execute_cmd(self, cmd):
         if cmd in self.cmds:
@@ -90,13 +115,6 @@ class Streamer(Process):
 
 
 # ------------------------------------------------------------------------------
-logging.basicConfig(level=logging.INFO, format='[%(process)-5d:%(threadName)-10s] %(name)s: %(levelname)s: %(message)s')
-
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    # client = Client(buffer_size=300000, buffer_window=10)
-    # client.connect(('', 51244))
-    # client.start_streaming()
-    # time.sleep(10)
-    # client.stop_streaming()
-    # client.disconnect()
+    logging.basicConfig(level=logging.INFO,
+                        format='[%(process)-5d:%(threadName)-10s] %(name)s: %(levelname)s: %(message)s')
