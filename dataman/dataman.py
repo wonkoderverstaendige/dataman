@@ -6,13 +6,61 @@ import sys
 import cmd
 import logging
 
-from dataman.lib.constants import LOG_LEVEL_VERBOSE
-from dataman.dataman_cli import DataMan
+from .lib.constants import LOG_LEVEL_VERBOSE
 
 __version__ = 0.01
 
 NO_EXIT_CONFIRMATION = True
 LOG_LEVEL = logging.INFO
+
+
+class DataMan(cmd.Cmd):
+    """Command line tool for quick data documentation."""
+
+    prompt = "dm> "
+    intro = "Data Manager\n"
+
+    def preloop(self):
+        self.log = logging.getLogger(__name__)
+        self.log.debug("starting DataMan CLI")
+        # process command line arguments etc.
+
+    def do_greet(self, user):
+        """greet [user name]
+        Simple user greeting. When used in combination with a parameter, will
+        respond with personalized greeting. Yay."""
+        if user:
+            print("hello ", user)
+        else:
+            print("hi there!")
+
+    def do_ls(self, path):
+        if not len(path):
+            path = '.'
+        import dataman.lib.dirstats as ds
+        ds.print_table(ds.gather(path))
+
+    def do_stats(self, path):
+        if not len(path):
+            path = '.'
+        import dataman.lib.dirstats as ds
+        ds.print_table(ds.gather(path))
+
+    def do_vis(self, path):
+        from dataman.vis import vis
+        vis.run(target=path)
+
+    def do_exit(self, line):
+        "Exit"
+        return True
+
+    def do_EOF(self, line):
+        "Exit"
+        return True
+
+    def postloop(self):
+        print("Done.")
+
 
 def main():
     # Command line parsing
@@ -29,12 +77,12 @@ def main():
     parser_cli = subparsers.add_parser('cli', help='Interactive CLI session')
 
     # STATS
-    parser_stats = subparsers.add_parser('stats', help='Dataset statistics.')
+    parser_stats = subparsers.add_parser('stats', help='Dataset stats (number channels, duration, sampling rate...')
     parser_stats.add_argument('path', help='Relative or absolute path to directory',
             default='.', nargs='?')
 
     # LS
-    parser_ls = subparsers.add_parser('ls', help='Directory listing with basic stats (e.g. size)')
+    parser_ls = subparsers.add_parser('ls', help='Directory listing with basic information (e.g. size)')
     parser_ls .add_argument('path', help='Relative or absolute path to directory',
             default='.', nargs='?')
 
