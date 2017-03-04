@@ -13,12 +13,31 @@ EXT_SOUND = ['.wav', '.mp3', '.snd', '.wma']
 EXT_IMAGE = ['.png', '.bmp', '.jpg', '.jpeg', '.pgm']
 EXT_DOC = ['.md', '.toml', '.xml', '.tsv', '.csv', '.txt', '.doc', '.rst']
 
+DEFAULT_COLS = ['fname', 'size', 'num_files', 'num_vid', 'num_img', 'num_snd', 'num_doc', 'data_fmt']
+COLUMNS = {'fname': ['F']}
+
+class Column:
+    def __init__(self, name, width=3, fmt=':', align='^', *args, **kwargs):
+        self.name = name
+        self.w = width
+        self.align = align
+        self.fmt = '{'+fmt+align+str(width)+'}'
+
+    def header(self):
+        if self.name in COLUMNS:
+            return self.fmt.format(COLUMNS[self.name])
+        else:
+            return self.fmt.format('Unknown')
+
+    def row(self, data):
+        return self.fmt.format(data)
+
 table_hdr = "{:^28}{sep}{:^6}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:^10}{sep}".format(
 "Folder name", "size", "#fil", "#vid", "#img", "#snd", '#doc', "format", sep=" ")
 
 _row = "{0:<28}{1}{2:>4}{3:>4}{4:>4}{5:>4}{6:>10}"
 
-def contains_dataset(root, dirs=None, files=None):
+def contains_data(root, dirs=None, files=None):
     """Check if directory or list of files contains a dataset of known format (OE, Kwik, etc.)"""
     if None in [dirs, files]:
         _, dirs, files = dir_content(root)
@@ -41,11 +60,16 @@ def dir_details(path):
     num_img= len([f for f in files if fext(f) in EXT_IMAGE])
     num_snd = len([f for f in files if fext(f) in EXT_SOUND])
     num_doc = len([f for f in files if fext(f) in EXT_DOC])
-    data_fmt = contains_dataset(path)
+    data_fmt = contains_data(path)
 
     return dict(fname=name, size=size, num_files=num_files, num_vid=num_vid,
             num_img=num_img, num_snd=num_snd, num_doc=num_doc,
             data_fmt=data_fmt)
+
+def data_stats(path):
+    fmt = contains_data(path)
+    assert(fmt)
+
 
 def gather(path):
     """Gather details on the path and its subdirectories.
@@ -82,9 +106,7 @@ def fit_str(string, max_len=10, weight=0.7):
     tail = int((max_len-len(indicator))*weight)
     return string[:head]+indicator+string[-tail:]
 
-def mk_row(row, colorized=True, cols=['fname', 'size', 'num_files',
-                                         'num_vid', 'num_img', 'num_snd', 'num_doc',
-                                         'data_fmt'], sepr='|'):
+def mk_row(row, colorized=True, cols=DEFAULT_COLS, sepr='|'):
     row_str = ''
     for c in cols:
         if c == 'fname':
