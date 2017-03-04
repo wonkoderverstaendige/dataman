@@ -3,8 +3,8 @@
 
 from __future__ import print_function
 import os
-from termcolor import colored
 import re
+from termcolor import colored
 
 def fmt_size(num, unit='B', si=True, sep=' ', col=False, pad=0):
     colors = {"k": "blue", "M": "green", "G": "red", "T": "cyan",
@@ -23,6 +23,7 @@ def fmt_size(num, unit='B', si=True, sep=' ', col=False, pad=0):
             else:
                 return "{:5.0f}{}{}{} ".format(num, sep, prefix, unit, pad=pad-6)
         num /= divisor
+
 
 def fext(fname):
     """Grabs the file extension of a file.
@@ -73,7 +74,7 @@ def dir_size(path):
     return total_size
 
 def terminal_size():
-    """Get size of currently used terminal. In many cases this is inaccruate.
+    """Get size of currently used terminal. In many cases this is inaccurate.
 
     Returns:
         Tuple of width, height.
@@ -81,7 +82,10 @@ def terminal_size():
     Raises:
         Unknown error when not run from a terminal.
     """
-    return map(int, os.popen('stty size', 'r').read().split())
+    # return map(int, os.popen('stty size', 'r').read().split())
+    # Python 3.3+
+    ts = os.get_terminal_size()
+    return ts.lines, ts.columns
 
 def _find_getch():
     """Helper to wait for a single character press, instead of having to use raw_input() requiring Enter
