@@ -12,6 +12,7 @@ Inspired by https://github.com/belevtsoff/rdaclient.py
 
 """
 
+from __future__ import print_function
 from multiprocessing import Array
 import ctypes as c
 import logging
@@ -98,7 +99,7 @@ class Buffer(object):
         nptype = datatypes.get_type(hdr.dataType)
 
         bufOffset = c.sizeof(hdr)
-        bufFlatSize = hdr.bufSizeBytes / np.dtype(nptype).itemsize
+        bufFlatSize = hdr.bufSizeBytes // np.dtype(nptype).itemsize
 
         # create numpy view object pointing to the raw array
         self.__raw = raw
@@ -198,8 +199,7 @@ class datatypes():
         ndtype : string
             numpy datatype (e.g. 'float32')
         """
-        idx = cls.types.values().index(ndtype)
-        return cls.types.keys()[idx]
+        return next(key for key, value in cls.types.items() if value == ndtype)
 
     @classmethod
     def get_type(cls, code):
@@ -273,11 +273,11 @@ if __name__ == '__main__':
     buf1.put_data(np.array([[1, 2], [3, 4]]))
     buf2.put_data(np.array([[5, 6], [7, 8]]), start=2)
 
-    print buf1
-    print buf2
+    print(buf1)
+    print(buf2)
 
     dat = buf2.get_data(0, 4)
     dat[0, 0] = 100
 
-    print buf1
-    print buf2
+    print(buf1)
+    print(buf2)

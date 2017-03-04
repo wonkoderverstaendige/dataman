@@ -5,15 +5,14 @@ from __future__ import print_function
 import sys
 import logging
 import cmd
-import lib.tools
-from lib.constants import LOG_LEVEL_VERBOSE
+from dataman.lib.constants import LOG_LEVEL_VERBOSE
 
 
 class DataMan(cmd.Cmd):
     """Command line tool for quick data documentation."""
 
     prompt = "dm> "
-    intro = "Data Manager\n --Ronny's way of avoiding having to stare at spreadsheets."
+    intro = "Data Manager\n"
 
     def preloop(self):
         self.log = logging.getLogger(__name__)
@@ -32,17 +31,17 @@ class DataMan(cmd.Cmd):
     def do_ls(self, path):
         if not len(path):
             path = '.'
-        import lib.dirstats as ds
+        import dataman.lib.dirstats as ds
         ds.print_table(ds.gather(path))
 
     def do_stats(self, path):
         if not len(path):
             path = '.'
-        import lib.dirstats as ds
+        import dataman.lib.dirstats as ds
         ds.print_table(ds.gather(path))
 
     def do_vis(self, path):
-        from vis import vis
+        from dataman.vis import vis
         vis.run(target=path)
 
     def do_exit(self, line):

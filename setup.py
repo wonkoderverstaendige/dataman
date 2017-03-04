@@ -10,9 +10,10 @@ config = {
         'download_url': '',
         'author_email': 'ronny.eichler@gmail.com',
         'version': '0.0.1',
-        'install_requires': ['nose', 'termcolor'],
+        'install_requires': ['nose', 'termcolor', 'vispy'],
         'packages': ['dataman'],
-        'scripts': [],
+        'entry_points': """[console_scripts]
+            dm=dataman.dataman:main""",
         'name': 'dataman'
         }
 

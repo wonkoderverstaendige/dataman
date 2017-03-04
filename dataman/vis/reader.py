@@ -8,6 +8,7 @@ Created on Sep 23, 2015 18:53
 File reader
 """
 
+from __future__ import print_function
 import numpy as np
 import re
 
@@ -51,7 +52,7 @@ def read_header(filename):
 def read_segment(filename, offset, count, dtype):
     """Read segment of a file from [offset] for [count]x[dtype]"""
     with open(filename, 'rb') as fid:
-        fid.seek(offset)
+        fid.seek(int(offset))
         segment = np.fromfile(fid, dtype=dtype, count=count)
     return segment
 
@@ -80,8 +81,9 @@ def read_record(filename, offset=0, count=30, dtype=DATA_DT):
 
 
 if __name__ == "__main__":
-    print read_header('data/2014-10-30_16-07-29/106_CH1.continuous')
-    print read_segment('data/2014-10-30_16-07-29/106_CH1.continuous', offset=SIZE_HEADER)['samples'].ravel()[0]
+    pass
+    # print(read_header('data/2014-10-30_16-07-29/106_CH1.continuous'))
+    # print(read_segment('data/2014-10-30_16-07-29/106_CH1.continuous', offset=SIZE_HEADER)['samples'].ravel()[0])
 
 
 

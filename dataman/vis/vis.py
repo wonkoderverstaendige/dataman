@@ -7,7 +7,8 @@
 """
 Multiple real-time digital signals with GLSL-based clipping.
 """
-from __future__ import division
+
+from __future__ import division, print_function
 import logging
 import os
 from vispy import gloo
@@ -16,13 +17,13 @@ from vispy import util
 import numpy as np
 import math
 
-from reader import read_record, read_header
+from .reader import read_record, read_header
 
 # Dimensions of plot segment/signals
 n_rows = 16
 n_cols = 4
 n_signals = n_rows*n_cols
-n_samples = 3e4
+n_samples = int(3e4)
 
 # Buffer to store all the pre-loaded signals
 buf = np.zeros((n_signals, n_samples), dtype=np.float32)

@@ -2,13 +2,11 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
-import tools
-from tools import fext, dir_content
 import os
 import sys
 from termcolor import colored
-import open_ephys
-import kwik
+from . import tools, open_ephys, kwik
+from .tools import fext, dir_content
 
 EXT_VIDEO = ['.avi', '.mp4', '.mkv', '.wmv']
 EXT_SOUND = ['.wav', '.mp3', '.snd', '.wma']

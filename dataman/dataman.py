@@ -6,15 +6,15 @@ import sys
 import cmd
 import logging
 
-from lib.constants import LOG_LEVEL_VERBOSE
-import lib.tools
-from dataman_cli import DataMan
+from dataman.lib.constants import LOG_LEVEL_VERBOSE
+from dataman.dataman_cli import DataMan
 
 __version__ = 0.01
 
 NO_EXIT_CONFIRMATION = True
 LOG_LEVEL = logging.INFO
-if __name__ == "__main__":
+
+def main():
     # Command line parsing
     import argparse
     parser = argparse.ArgumentParser(prog="DataMan")
@@ -67,4 +67,8 @@ if __name__ == "__main__":
             pass
     else:
         DataMan().onecmd(' '.join(sys.argv[1:]))
+
+
+if __name__ == "__main__":
+    main()
 

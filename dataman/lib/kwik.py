@@ -4,7 +4,7 @@
 from __future__ import print_function
 import os
 import xml.etree.ElementTree as etree
-from tools import fext, dir_content
+from .tools import fext, dir_content
 
 def detect(root, dirs=None, files=None):
     for f in files:

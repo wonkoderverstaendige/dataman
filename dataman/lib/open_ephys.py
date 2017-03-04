@@ -4,7 +4,7 @@
 from __future__ import print_function
 import os
 import xml.etree.ElementTree as etree
-from tools import fext, dir_content
+from .tools import fext, dir_content
 
 def detect(root=None, dirs=None, files=None):
     """Checks for existence of an open ephys formatted data set in the root directory.
