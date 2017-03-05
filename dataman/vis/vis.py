@@ -21,7 +21,7 @@ import math
 from ..lib.open_ephys import read_record
 from ..lib import open_ephys, tools
 
-from oio import util
+from oio import util as oio_util
 
 # Load vertex and fragment shaders
 SHADER_PATH = os.path.join(os.path.dirname(__file__), 'shaders')
@@ -73,9 +73,14 @@ class Vis(app.Canvas):
 
         # Color of each vertex
         # TODO: make it more efficient by using a GLSL-based color map and the index.
-        color = np.repeat(np.random.uniform(size=(self.n_rows, 3),
+        color = np.repeat(np.random.uniform(size=(self.n_rows/4, 3),
                                             low=.1, high=.9),
-                          self.max_samples_visible * self.n_cols, axis=0).astype(np.float32)
+                          self.max_samples_visible * self.n_cols*4, axis=0).astype(np.float32)
+        print()
+        cmap_path = os.path.join(os.path.join(os.path.dirname(__file__), 'shaders'), '4x4x8_half_vega20c_cmap.csv')
+        cmap = np.loadtxt(cmap_path, delimiter=',')
+        # colors = np.repeat(cmap[:self.n_channels])
+        print(color.shape, cmap.shape)
 
         # Signal 2D index of each vertex (row and col) and x-index (sample index
         # within each signal).
@@ -241,7 +246,7 @@ def run(*args, **kwargs):
 
     cli_args = parser.parse_args(*args)
     if 'layout' in cli_args:
-        channels = util.flat_channel_list(cli_args.layout)[:cli_args.channels]
+        channels = oio_util.flat_channel_list(cli_args.layout)[:cli_args.channels]
         print(channels)
     else:
         channels = None
