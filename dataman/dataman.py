@@ -9,7 +9,7 @@ import argparse
 
 from .lib.constants import LOG_LEVEL_VERBOSE
 
-__version__ = 0.01
+__version__ = 0.1
 
 NO_EXIT_CONFIRMATION = True
 LOG_LEVEL = logging.INFO
@@ -30,7 +30,7 @@ class DataMan(cmd.Cmd):
         parser = argparse.ArgumentParser('Recording statistics', prefix_chars='+/')
         parser.add_argument('path', help='Relative or absolute path to directory',
                 default='.', nargs='?')
-        cli_args = parser.parse_args(line.split(' '))
+        cli_args = parser.parse_args(line.split(' ') if line else '')
         path = cli_args.path
 
         import dataman.lib.dirstats as ds
@@ -40,7 +40,7 @@ class DataMan(cmd.Cmd):
         parser = argparse.ArgumentParser('Recording statistics', prefix_chars='+/')
         parser.add_argument('path', help='Relative or absolute path to directory',
                 default='.', nargs='?')
-        cli_args = parser.parse_args(line.split(' '))
+        cli_args = parser.parse_args(line.split(' ') if line else '')
         path = cli_args.path
 
         import dataman.lib.dirstats as ds
