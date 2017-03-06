@@ -33,7 +33,7 @@ void main() {
     vec2 position = vec2(x, a_position*u_scale.y);
 
     // Find the affine transformation for the subplots.
-    vec2 a = vec2(1./ncols, 1./nrows)*.96;
+    vec2 a = vec2(1./ncols, 1./nrows)*1.0;  // reduce to e.g. 0.98 for borders between columns
     vec2 b = vec2(-1 + 2*(a_index.x+.5) / ncols,
                   -1 + 2*(a_index.y+.5) / nrows);
 

@@ -33,7 +33,8 @@ with open(os.path.join(SHADER_PATH, 'vis.frag')) as fs:
 
 class Vis(app.Canvas):
     def __init__(self, target_dir, n_cols=1, n_channels=64, max_samples_visible=30000, channels=None):
-        app.Canvas.__init__(self, title='Use your wheel to zoom!', keys='interactive')
+        app.Canvas.__init__(self, title='Use your wheel to zoom!', keys='interactive', size=(1920, 1080),
+                            position=(0, 0))
         self.logger = logging.getLogger("Vis")
         # running traces, looks cool, but useless for the most part
         self.running = False
@@ -73,14 +74,13 @@ class Vis(app.Canvas):
 
         # Color of each vertex
         # TODO: make it more efficient by using a GLSL-based color map and the index.
-        color = np.repeat(np.random.uniform(size=(self.n_rows/4, 3),
+        color = np.repeat(np.random.uniform(size=(self.n_rows//4, 3),
                                             low=.1, high=.9),
                           self.max_samples_visible * self.n_cols*4, axis=0).astype(np.float32)
-        print()
         cmap_path = os.path.join(os.path.join(os.path.dirname(__file__), 'shaders'), '4x4x8_half_vega20c_cmap.csv')
         cmap = np.loadtxt(cmap_path, delimiter=',')
         # colors = np.repeat(cmap[:self.n_channels])
-        print(color.shape, cmap.shape)
+        # print(color.shape, cmap.shape)
 
         # Signal 2D index of each vertex (row and col) and x-index (sample index
         # within each signal).
@@ -138,7 +138,7 @@ class Vis(app.Canvas):
             self.offset = 0
         elif self.offset >= (self.n_samples_total-self.max_samples_visible)//self.block_size:
             self.offset = (self.n_samples_total-self.max_samples_visible)//self.block_size
-        print(self.offset)
+        # print(self.offset)
 
     def on_resize(self, event):
         gloo.set_viewport(0, 0, *event.physical_size)
@@ -179,7 +179,7 @@ class Vis(app.Canvas):
                 shift_signal = dx/width
                 shift_samples = shift_signal * self.max_samples_visible
                 shift_offset = int(shift_samples/1024)
-                print(self.drag_offset-shift_offset)
+                # print(self.drag_offset-shift_offset)
                 self.set_offset(absolute=self.drag_offset-shift_offset)
 
             if event.button == 2:
@@ -208,6 +208,16 @@ class Vis(app.Canvas):
                 self.set_scale(factor_y=math.exp(2.5*delta))
 
         self.update()
+
+    def on_mouse_double_click(self, event):
+        x, y = event.pos
+        x_r = x/self.size[0]
+        y_r = y/self.size[1]
+        # print(event.pos, self.size, x_r, y_r)
+        t_r = x_r*self.n_cols - math.floor(x_r*self.n_cols)
+        t_sample = (t_r * self.max_samples_visible + self.offset*self.block_size)
+        t_sec = t_sample/self.fs
+        print('Sample {} @ {}'.format(int(t_sample), tools.fmt_time(t_sec)))
 
     def on_timer(self, event):
         """Frame update callback."""
@@ -241,11 +251,11 @@ def run(*args, **kwargs):
     parser.add_argument('path', help='Relative or absolute path to directory',
                         default='.', nargs='?')
     parser.add_argument('+c', '++cols', help='Number of columns', default=1, type=int)
-    parser.add_argument('+C', '++channels', help='Number of channels', default=32, type=int)
+    parser.add_argument('+C', '++channels', help='Number of channels', default=64, type=int)
     parser.add_argument('+l', '++layout', help='Path to probe file defining channel order')
 
     cli_args = parser.parse_args(*args)
-    if 'layout' in cli_args:
+    if 'layout' in cli_args and cli_args.layout is not None:
         channels = oio_util.flat_channel_list(cli_args.layout)[:cli_args.channels]
         print(channels)
     else:
