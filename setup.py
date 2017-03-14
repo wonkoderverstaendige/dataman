@@ -9,7 +9,7 @@ config = {
         'url': '',
         'download_url': '',
         'author_email': 'ronny.eichler@gmail.com',
-        'version': '0.0.1',
+        'version': '0.1.1',
         'install_requires': ['nose', 'termcolor', 'vispy', 'numpy'],
         'packages': ['dataman'],
         'entry_points': """[console_scripts]
