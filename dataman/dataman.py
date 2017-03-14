@@ -50,6 +50,9 @@ class DataMan(cmd.Cmd):
         from dataman.vis import vis
         vis.run(line.split(' '))
 
+    def do_convert(self, line):
+        pass
+
     def do_proc(self, line):
         print(sys.argv)
 
@@ -82,6 +85,7 @@ def main():
     parser_proc = subparsers.add_parser('proc', help='(Pre-)processing [NI}')
     parser_doc = subparsers.add_parser('doc', help='Documentation for prosperity [NI}')
     parser_check = subparsers.add_parser('check', help='Check/verify data and documentation integrity [NI}')
+    parser_convert = subparsers.add_parser('convert', help='Convert into a different file format. [NI]')
 
     cli_args, cmd_args = parser.parse_known_args()
 
