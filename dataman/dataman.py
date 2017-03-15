@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
 import sys
 import cmd
 import logging
 import argparse
+import os.path as op
 
 from .lib.constants import LOG_LEVEL_VERBOSE
 
@@ -32,7 +32,9 @@ class DataMan(cmd.Cmd):
         parser.add_argument('path', help='Relative or absolute path to directory',
                             default='.', nargs='?')
         cli_args = parser.parse_args(line.split(' ') if line else '')
-        path = cli_args.path
+        self.log.debug('ls with args: {}'.format(cli_args))
+        path = op.abspath(op.expanduser(cli_args.path))
+        self.log.debug('Expanded path: {}'.format(path))
 
         import dataman.lib.dirstats as ds
         ds.print_table(ds.gather(path))
@@ -42,7 +44,9 @@ class DataMan(cmd.Cmd):
         parser.add_argument('path', help='Relative or absolute path to directory',
                             default='.', nargs='?')
         cli_args = parser.parse_args(line.split(' ') if line else '')
-        path = cli_args.path
+        self.log.debug('Stats with args: {}'.format(cli_args))
+        path = op.abspath(op.expanduser(cli_args.path))
+        self.log.debug('Expanded path: {}'.format(path))
 
         import dataman.lib.dirstats as ds
         ds.print_table(ds.gather(path))
@@ -100,13 +104,14 @@ def main():
     log_level = LOG_LEVEL_VERBOSE if cli_args.debug else LOG_LEVEL
     logging.basicConfig(level=log_level,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    log = logging.getLogger(__name__)
+    logger = logging.getLogger(__name__)
 
-    log.debug('CLI_ARGS: {}'.format(cli_args))
-    log.debug('CMD_ARGS: {}'.format(cmd_args))
+    logger.debug('CLI_ARGS: {}'.format(cli_args))
+    logger.debug('CMD_ARGS: {}'.format(cmd_args))
 
     # start cli
     if cli_args.command in [None, 'cli']:
+        logger.debug('Starting CLI via command: {}'.format(cli_args.command))
         try:
             DataMan().cmdloop()
         except KeyboardInterrupt:
@@ -114,7 +119,7 @@ def main():
 
     # some other command was given
     else:
-        print('{} {:}'.format(cli_args.command, ' '.join(cmd_args)))
+        logger.debug('Command {}, args: {:}'.format(cli_args.command, ' '.join(cmd_args)))
         DataMan().onecmd('{} {}'.format(cli_args.command, ' '.join(cmd_args)))
 
 
