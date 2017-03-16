@@ -4,6 +4,9 @@
 import os
 import re
 from termcolor import colored
+import logging
+
+logger = logging.getLogger(__name__)
 
 def fmt_size(num, unit='B', si=True, sep=' ', col=False, pad=0):
     colors = {"k": "blue", "M": "green", "G": "red", "T": "cyan",
@@ -59,19 +62,36 @@ def fext(fname):
     """
     return os.path.splitext(fname)[1]
 
-def dir_content(path):
+
+def full_path(path):
+    """Return full path of a potentially relative path, including ~ expansion.
+
+    Args:
+        Path
+
+    Returns:
+        Absolute(Expanduser(Path))
+    """
+    return os.path.abspath(os.path.expanduser(path))
+
+def path_content(path):
     """Gathers root and first level content of a directory.
 
     Args:
         path: Relative or absolute path to a directory.
 
     Returns:
-        A tuple containing the root directory, the directories and the files
+        A tuple containing the root path, the directories and the files
         contained in the root directory.
 
-        (dirpath, dirnames, filenames)
-    """ 
-    return next(os.walk(path))
+        (path, dir_names, file_names)
+    """
+    path = full_path(path)
+    assert(os.path.exists(path))
+    if os.path.isdir((path)):
+        return next(os.walk(path))
+    else:
+        return os.path.basename(path), [], [path]
 
 def dir_size(path):
     """Calculate size of directory including all subdirectories and files
@@ -82,6 +102,11 @@ def dir_size(path):
     Returns:
         Integer value of size in Bytes.
     """
+    logger.debug('dir_size path: {}'.format(path))
+    assert os.path.exists(path)
+    if not os.path.isdir(path):
+        return os.path.getsize(path)
+
     total_size = 0
     for root, dirs, files in os.walk(path):
         for f in files:
@@ -114,6 +139,7 @@ def _find_getch():
     Returns:
         Function that works as blocking single character input without prompt.
     """
+    # FIXME: Find where I took this piece of code from... and attribute. SO perhaps?
     try:
         import termios
     except ImportError:
@@ -134,6 +160,7 @@ def _find_getch():
         return ch
 
     return _getch
+
 
 ansi_escape = re.compile(r'\x1b[^m]*m')
 def strip_ansi(string):
