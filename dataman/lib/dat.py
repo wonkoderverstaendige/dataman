@@ -21,10 +21,8 @@ def detect(base_path, pre_walk=None):
     Returns:
         None if no data set found, else string
     """
-    # if pre_walk is None:
     root, dirs, files = path_content(base_path) if pre_walk is None else pre_walk
-    # else:
-    #     root, dirs, files = pre_walk
+
 
     logger.debug('Detecting in dirs: {}, files: {}'.format(dirs, files))
     dat_files = [f for f in files if fext(f) == '.dat']
@@ -44,6 +42,7 @@ def config(base_path, *args, **kwargs):
     return {'HEADER': {'sampling_rate': None,
                        'block_size': 1024,
                        'n_samples': op.getsize(base_path) / ITEMSIZE / kwargs['n_channels']},
+            'DTYPE': None,
             'INFO': None,
             'SIGNALCHAIN': None,
             'FPGA_NODE': None,
@@ -54,9 +53,11 @@ def fill_buffer(target, buffer, offset, count, *args, **kwargs):
     channels = kwargs['channels']
     byte_offset = offset * len(channels) * ITEMSIZE * 1024
     n_samples = count * len(channels)
+    dtype = kwargs['dtype'] if 'dtype' in kwargs else 'int16'
 
     with open(target, 'rb') as dat_file:
         dat_file.seek(byte_offset)
         logger.debug('offset: {}, byte_offset: {}, count: {}'.format(offset, byte_offset, count))
-        buffer[:count] = np.fromfile(dat_file, count=n_samples, dtype='int16').reshape(-1, len(channels)).T.astype(
+        chunk = np.fromfile(dat_file, count=n_samples, dtype=dtype).reshape(-1, len(channels)).T.astype(
             'float32') * AMPLITUDE_SCALE
+        buffer[:count] = chunk

@@ -146,6 +146,7 @@ def config(base_dir, *args, **kwargs):
     cfg = config_xml(base_dir)
     cfg['FPGA_NODE'] = _fpga_node(cfg['SIGNALCHAIN'])
     cfg['HEADER'] = config_header(base_dir, cfg['FPGA_NODE'])
+    cfg['DTYPE'] = 'int16'
     return cfg
 
 

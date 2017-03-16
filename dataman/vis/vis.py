@@ -34,7 +34,8 @@ with open(os.path.join(SHADER_PATH, 'vis.frag')) as fs:
 class Vis(app.Canvas):
     def __init__(self, target_path, n_cols=1, n_channels=64,
                  max_samples_visible=30000, channels=None, bad_channels=None,
-                 default_sampling_rate=3e4):
+                 default_sampling_rate=3e4, *args, **kwargs):
+
         app.Canvas.__init__(self, title='Use your wheel to zoom!', keys='interactive', size=(1920, 1080),
                             position=(0, 0), app='pyqt5')
         self.logger = logging.getLogger(__name__)
@@ -49,6 +50,8 @@ class Vis(app.Canvas):
         self.logger.debug('Target module: {}'.format(self.format))
 
         self.cfg = self._get_target_config()
+        if 'dtype' in kwargs:
+            self.cfg['DTYPE'] = kwargs['dtype']
         self.logger.debug(self.cfg)
 
         if self.cfg['HEADER']['sampling_rate'] is None:
@@ -162,9 +165,9 @@ class Vis(app.Canvas):
 
         if old_offset != self.offset:
             self.dirty = True
-            self.logger.debug(
-                'Block offset: {}, @ {}'.format(self.offset, tools.fmt_time(
-                    self.offset * self.cfg['HEADER']['block_size'] / self.fs)))
+            # self.logger.debug(
+            #     'Block offset: {}, @ {}'.format(self.offset, tools.fmt_time(
+            #         self.offset * self.cfg['HEADER']['block_size'] / self.fs)))
 
     def on_resize(self, event):
         gloo.set_viewport(0, 0, *event.physical_size)
@@ -269,11 +272,12 @@ class Vis(app.Canvas):
         self.program.draw('line_strip')
 
     def _new_chunk(self):
-        self.logger.debug('Loading chunk #{}'.format(self.offset))
+        self.logger.debug('New chunk at offset #{}'.format(self.offset))
         channels = list(range(self.n_channels)) if self.channel_order is None else self.channel_order[:self.n_channels]
 
         self.format.fill_buffer(target=self.target_path, buffer=self.buf, offset=self.offset,
-                                count=self.max_samples_visible, channels=channels, node_id=self.cfg['FPGA_NODE'])
+                                count=self.max_samples_visible, channels=channels, node_id=self.cfg['FPGA_NODE'],
+                                dtype=self.cfg['DTYPE'])
 
 
 def run(*args, **kwargs):
@@ -284,6 +288,7 @@ def run(*args, **kwargs):
     parser.add_argument('+c', '++cols', help='Number of columns', default=1, type=int)
     parser.add_argument('+C', '++channels', help='Number of channels', default=64, type=int)
     parser.add_argument('+l', '++layout', help='Path to probe file defining channel order')
+    parser.add_argument('++dtype', help='Data type if needed (e.g. float32 dat files', default='int16')
 
     cli_args = parser.parse_args(*args)
     if 'layout' in cli_args and cli_args.layout is not None:
@@ -297,7 +302,8 @@ def run(*args, **kwargs):
               n_cols=cli_args.cols,
               n_channels=cli_args.channels,
               channels=channels,
-              bad_channels=bad_channels)
+              bad_channels=bad_channels,
+              dtype=cli_args.dtype)
     app.run()
 
 
