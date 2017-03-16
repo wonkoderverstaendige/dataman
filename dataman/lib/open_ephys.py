@@ -1,12 +1,13 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import os
 import xml.etree.ElementTree as ETree
-from .tools import fext, dir_content, fmt_time
+from .tools import fext, path_content, fmt_time
 import numpy as np
 import re
 import logging
+
+FMT_NAME = 'OE'
 
 SIZE_HEADER = 1024  # size of header in B
 NUM_SAMPLES = 1024  # number of samples per record
@@ -47,6 +48,17 @@ def read_header(filename):
     return header_dict
 
 
+def fill_buffer(target, buffer, offset, count, *args, **kwargs):
+    channels = kwargs['channels']
+    node_id = kwargs['node_id']
+    for c in channels:
+        buffer[c, :count] = \
+            read_record(os.path.join(target, '{node_id}_CH{channel}.continuous'.format(
+                node_id=node_id,
+                channel=c + 1)),
+                        offset=offset)[:count]
+
+
 def read_segment(filename, offset, count, dtype):
     """Read segment of a file from [offset] for [count]x[dtype]"""
     with open(filename, 'rb') as fid:
@@ -62,26 +74,27 @@ def read_record(filename, offset=0, count=30, dtype=DATA_DT):
                .astype(np.float32) / 2 ** 10
 
 
-def detect(base_dir=None, dirs=None, files=None):
+def detect(base_path, pre_walk=None):
     """Checks for existence of an open ephys formatted data set in the root directory.
 
     Args:
-        base_dir: Directory to search in.
-        dirs: list of subdirectories in root. Will be scanned if not provided.
-        files: List of files in the root directory. Will be scanned if not provided.
+        base_path: Path to search at. For OE data sets, typically a directory containing
+                   .continuous, .events and a settings.xml file.
+        pre_walk: Tuple from previous path_content call
 
     Returns:
         None if no data set found, else a dict of configuration data from settings.xml
     """
-    # TODO: Make all three optional and work with either
-    if dirs is None or files is None:
-        _, dirs, files = dir_content(base_dir)
+    # if not os.path.isdir(base_path) and os.path.splitext(base_path)[1]!='.continuous':
+    #     logger.warning('Path {} neither a directory nor a .continuous file.'.format(base_path))
+    #     return None
+    root, dirs, files = path_content(base_path) if pre_walk is None else pre_walk
 
-    # FIXME: Do once for files
+    # FIXME: Do once for all files. If single file, indicate
     for f in files:
         if fext(f) in ['.continuous']:
-            fv = config_xml(base_dir)['INFO']['VERSION']
-            return "OE_v{}".format(fv if fv else '???')
+            fv = config_xml(base_path)['INFO']['VERSION']
+            return "{}_v{}".format(FMT_NAME, fv if fv else '???')
     else:
         return None
 
@@ -93,7 +106,7 @@ def find_settings_xml(base_dir):
 
     :return: Path to settings.xml relative to base_dir
     """
-    _, dirs, files = dir_content(base_dir)
+    _, dirs, files = path_content(base_dir)
     if "settings.xml" in files:
         return os.path.join(base_dir, 'settings.xml')
     else:
@@ -121,7 +134,7 @@ def _fpga_node(chain_dict):
         raise BaseException('Node ID not found in xml dict {}'.format(chain_dict))
 
 
-def config(base_dir):
+def config(base_dir, *args, **kwargs):
     """Get recording/data set configuration from open ephys GUI settings.xml file and the header
     of files from the data set
 
@@ -131,22 +144,22 @@ def config(base_dir):
     Returns:
         Dictionary with configuration entries. (INFO, SIGNALCHAIN, HEADER, AUDIO, FPGA_NODE)"""
     cfg = config_xml(base_dir)
-    cfg['HEADER'] = config_header(base_dir)
     cfg['FPGA_NODE'] = _fpga_node(cfg['SIGNALCHAIN'])
+    cfg['HEADER'] = config_header(base_dir, cfg['FPGA_NODE'])
     return cfg
 
 
-def config_header(base_dir):
+def config_header(base_dir, fpga_node='106'):
     """Reads header information from open ephys .continuous files in target path.
     This returns some "reliable" information about the sampling rate."""
     # Data file header (reliable sampling rate information)
     # FIXME: Make sure all headers agree...
-    file_name = os.path.join(base_dir, '106_CH1.continuous')
+    file_name = os.path.join(base_dir, '{}_CH1.continuous'.format(fpga_node))
     header = read_header(file_name)
     fs = header['sampleRate']
-    n_blocks = (os.path.getsize(file_name) - SIZE_HEADER) / SIZE_RECORD
-    assert (os.path.getsize(file_name) - SIZE_HEADER) % SIZE_RECORD == 0
-    n_samples = int(n_blocks * NUM_SAMPLES)
+    n_samples = int(os.path.getsize(file_name) - SIZE_HEADER)
+    n_blocks = n_samples / SIZE_RECORD
+    assert n_samples % SIZE_RECORD == 0
 
     logger.info('Fs = {:.2f}Hz, {} blocks, {} samples, {}'
                 .format(fs, n_blocks, n_samples, fmt_time(n_samples / fs)))
