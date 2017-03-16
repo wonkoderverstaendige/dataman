@@ -2,13 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import os
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ETree
 from .tools import fext, dir_content, fmt_time
 import numpy as np
 import re
-import math
 import logging
-
 
 SIZE_HEADER = 1024  # size of header in B
 NUM_SAMPLES = 1024  # number of samples per record
@@ -22,11 +20,11 @@ logger = logging.getLogger(__name__)
 
 # (2048 + 22) Byte = 2070 Byte total
 # FIXME: The rec_mark comes after the samples. Currently data is read assuming full NUM_SAMPLE record!
-DATA_DT = np.dtype([('timestamp', np.int64),            # 8 Byte
-                    ('n_samples', np.uint16),           # 2 Byte
-                    ('rec_num', np.uint16),             # 2 Byte
+DATA_DT = np.dtype([('timestamp', np.int64),  # 8 Byte
+                    ('n_samples', np.uint16),  # 2 Byte
+                    ('rec_num', np.uint16),  # 2 Byte
                     ('samples', ('>i2', NUM_SAMPLES)),  # 2 Byte each x 1024 typ.
-                    ('rec_mark', (np.uint8, 10))])      # 10 Byte
+                    ('rec_mark', (np.uint8, 10))])  # 10 Byte
 
 
 def read_header(filename):
@@ -59,9 +57,9 @@ def read_segment(filename, offset, count, dtype):
 
 def read_record(filename, offset=0, count=30, dtype=DATA_DT):
     # FIXME: Stupid undocumented magic division of return value...
-    return read_segment(filename, offset=SIZE_HEADER+offset*SIZE_RECORD, count=count, dtype=dtype)['samples']\
-        .ravel()\
-        .astype(np.float32)/2**10
+    return read_segment(filename, offset=SIZE_HEADER + offset * SIZE_RECORD, count=count, dtype=dtype)['samples'] \
+               .ravel() \
+               .astype(np.float32) / 2 ** 10
 
 
 def detect(base_dir=None, dirs=None, files=None):
@@ -92,8 +90,7 @@ def find_settings_xml(base_dir):
     """Search for the settings.xml file in the base directory.
 
     :param base_dir: Base directory of data set
-    :param dirs: List of directories from globbing
-    :param files: List of files from globbing
+
     :return: Path to settings.xml relative to base_dir
     """
     _, dirs, files = dir_content(base_dir)
@@ -108,13 +105,13 @@ def _fpga_node(chain_dict):
     finding the proper .continuous files.
 
     Args:
-        base_dir: Root directory of data set.
+        chain_dict: Root directory of data set.
 
     Returns:
         string of NodeID (e.g. '106')
     """
     # chain = config_xml(base_dir)['SIGNALCHAIN']
-    nodes = [p['attrib']['NodeId'] for p in chain_dict if p['type']=='PROCESSOR' and 'FPGA' in p['attrib']['name']]
+    nodes = [p['attrib']['NodeId'] for p in chain_dict if p['type'] == 'PROCESSOR' and 'FPGA' in p['attrib']['name']]
     logger.info('Found FPGA node(s): {}'.format(nodes))
     if len(nodes) == 1:
         return nodes[0]
@@ -147,12 +144,12 @@ def config_header(base_dir):
     file_name = os.path.join(base_dir, '106_CH1.continuous')
     header = read_header(file_name)
     fs = header['sampleRate']
-    n_blocks = (os.path.getsize(file_name)-SIZE_HEADER)/SIZE_RECORD
-    assert (os.path.getsize(file_name)-SIZE_HEADER)%SIZE_RECORD == 0
-    n_samples = int(n_blocks*NUM_SAMPLES)
+    n_blocks = (os.path.getsize(file_name) - SIZE_HEADER) / SIZE_RECORD
+    assert (os.path.getsize(file_name) - SIZE_HEADER) % SIZE_RECORD == 0
+    n_samples = int(n_blocks * NUM_SAMPLES)
 
     logger.info('Fs = {:.2f}Hz, {} blocks, {} samples, {}'
-                     .format(fs, n_blocks, n_samples, fmt_time(n_samples/fs)))
+                .format(fs, n_blocks, n_samples, fmt_time(n_samples / fs)))
 
     return dict(n_blocks=int(n_blocks),
                 block_size=NUM_SAMPLES,
@@ -182,14 +179,14 @@ def config_xml(base_dir):
 
     # Settings.xml file
     xml_path = find_settings_xml(base_dir)
-    root = ET.parse(xml_path).getroot()
+    root = ETree.parse(xml_path).getroot()
 
     # Recording system information
     info = dict(
-        VERSION = root.find('INFO/VERSION').text,
-        DATE = root.find('INFO/DATE').text,
-        OS = root.find('INFO/OS').text,
-        MACHINE = root.find('INFO/VERSION').text
+        VERSION=root.find('INFO/VERSION').text,
+        DATE=root.find('INFO/DATE').text,
+        OS=root.find('INFO/OS').text,
+        MACHINE=root.find('INFO/VERSION').text
     )
 
     # Signal chain/processing nodes

@@ -15,6 +15,9 @@
     [ ] dm ls should return number of datasets on subfolders
     [ ] Logging verbosity with --log=INFO etc.
     [ ] dataman configuration for quick loading/inspection/overrides (dataman.conf)
+
+# LS/Stats
+    [ ] Order file list by file/directory name!
     
 # Urgent
     [ ] Holy frick, we forgot about the streaming branch!

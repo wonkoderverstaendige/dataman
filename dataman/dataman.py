@@ -65,11 +65,11 @@ class DataMan(cmd.Cmd):
         print(sys.argv)
 
     def do_exit(self, line):
-        "Exit"
+        """Exit"""
         return True
 
     def do_EOF(self, line):
-        "Exit"
+        """Exit"""
         return True
 
     def postloop(self):
