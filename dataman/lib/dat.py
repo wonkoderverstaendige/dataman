@@ -41,7 +41,6 @@ def config(base_path, *args, **kwargs):
     if not 'n_channels' in kwargs:
         raise BaseException('Unknown channel number, unable to unravel flat dat file.')
 
-    logger.debug('Returning "empty" config dict')
     return {'HEADER': {'sampling_rate': None,
                        'block_size': 1024,
                        'n_samples': op.getsize(base_path) / ITEMSIZE / kwargs['n_channels']},

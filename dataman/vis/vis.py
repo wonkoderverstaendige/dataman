@@ -102,9 +102,10 @@ class Vis(app.Canvas):
         # cmap = np.loadtxt(cmap_path, delimiter=',')
         # colors = np.repeat(cmap[:self.n_channels])
         # print(color.shape, cmap.shape)
-        color = np.repeat(np.random.uniform(size=(self.n_rows // 4, 3),
+        group = min(self.n_channels, 4)
+        color = np.repeat(np.random.uniform(size=(math.ceil(self.n_rows / 4), 3),
                                             low=.1, high=.9),
-                          self.max_samples_visible * self.n_cols * 4, axis=0).astype(np.float32)
+                          self.max_samples_visible * self.n_cols * group, axis=0).astype(np.float32)
 
         # Signal 2D index of each vertex (row and col) and x-index (sample index
         # within each signal).
