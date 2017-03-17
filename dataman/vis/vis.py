@@ -31,7 +31,7 @@ with open(os.path.join(SHADER_PATH, 'vis.frag')) as fs:
 
 class Vis(app.Canvas):
     def __init__(self, target_path, n_cols=1, n_channels=64,
-                 max_samples_visible=30000, channels=None, bad_channels=None,
+                 max_samples_visible=60000, channels=None, bad_channels=None,
                  default_sampling_rate=3e4, *args, **kwargs):
 
         app.Canvas.__init__(self, title='Use your wheel to zoom!', keys='interactive', size=(1920, 1080),
@@ -110,15 +110,23 @@ class Vis(app.Canvas):
 
         # Signal 2D index of each vertex (row and col) and x-index (sample index
         # within each signal).
-        # FIXME: Build from lists for readability
-        index = np.c_[np.repeat(np.repeat(np.arange(self.n_cols), self.n_rows), self.max_samples_visible),
-                      np.repeat(np.tile(np.arange(self.n_rows), self.n_cols), self.max_samples_visible),
-                      np.tile(np.arange(self.max_samples_visible), self.n_channels)] \
-            .astype(np.float32)
+        # index = np.c_[np.repeat(np.repeat(np.arange(self.n_cols), self.n_rows), self.max_samples_visible),
+        #               np.repeat(np.tile(np.arange(self.n_rows), self.n_cols), self.max_samples_visible),
+        #               np.tile(np.arange(self.max_samples_visible), self.n_channels)] \
+        #     .astype(np.float32)
+
+        lr = lambda n: list(range(n))
+        flatten = lambda l: [item for sl in l for item in sl]
+
+        col_idc = flatten([[r] * self.n_rows * self.max_samples_visible for r in lr(self.n_cols)])
+        row_idc = flatten([[r] * self.max_samples_visible for r in lr(self.n_rows)]) * self.n_cols
+        ch_idc = lr(self.max_samples_visible) * self.n_channels
+        # needs a copy to make memory contiguous
+        idc = np.transpose(np.array([col_idc, row_idc, ch_idc], dtype='float32'))
 
         self.program['a_position'] = self.buf
         self.program['a_color'] = color
-        self.program['a_index'] = index
+        self.program['a_index'] = idc.copy()
         self.program['u_scale'] = (1., max(.1, 1. - 1 / self.n_channels))
         self.program['u_size'] = (self.n_rows, self.n_cols)
         self.program['u_n'] = self.max_samples_visible
