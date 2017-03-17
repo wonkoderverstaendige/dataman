@@ -9,22 +9,21 @@ Multiple real-time digital signals with GLSL-based clipping.
 """
 
 import logging
-import time
+import math
 import os
 import os.path as op
 import sys
-from vispy import gloo
-from vispy import app
-from vispy.util import keys
-import numpy as np
-import math
-
+import time
 from multiprocessing import Queue
-from .Buffer import Buffer
-from .Streamer import Streamer
 
-from ..lib import open_ephys, dat, kwik, tools
+import numpy as np
 from oio import util as oio_util
+from vispy import app
+from vispy import gloo
+from vispy.util import keys
+
+from dataman.lib.Buffer import Buffer
+from ..lib import open_ephys, dat, kwik, tools
 
 # Load vertex and fragment shaders
 SHADER_PATH = os.path.join(os.path.dirname(__file__), 'shaders')
@@ -36,7 +35,7 @@ with open(os.path.join(SHADER_PATH, 'vis.frag')) as fs:
 
 class Vis(app.Canvas):
     def __init__(self, target_path, n_cols=1, n_channels=64,
-                 buffer_length=60000, channels=None, bad_channels=None,
+                 buffer_length=30000, channels=None, bad_channels=None,
                  default_sampling_rate=3e4, *args, **kwargs):
 
         app.Canvas.__init__(self, title='Use your wheel to zoom!', keys='interactive', size=(1920, 1080),
@@ -68,18 +67,19 @@ class Vis(app.Canvas):
         self.duration_total = tools.fmt_time(self.n_samples_total / self.fs)
 
         # Buffer to store all the pre-loaded signals
-        self.buf = np.zeros((self.n_channels, self.buffer_length), dtype=np.float32)
+        # self.buf = np.zeros((self.n_channels, self.buffer_length), dtype=np.float32)
 
 
         # Buffer to store all the pre-loaded signals
-        self.__buf = Buffer()
-        self.__buf.initialize(nChannels=self.n_channels, nSamples=self.buffer_length, np_type='float32')
-        # self.__buf.put_data(np.zeros((self.n_channels, self.n_samples), dtype=np.float32))
+        self.buf = Buffer()
+        self.buf.initialize(n_channels=self.n_channels, n_samples=self.buffer_length, np_dtype='float32')
+        print(self.buf.raw)
+        # self.buf.put_data(np.zeros((self.n_channels, self.buffer_length), dtype=np.float32))
 
         # Streamer to keep buffer filled
         self.__streamer = None
         self.stream_queue = Queue()
-        #self.start_streaming()
+        self.start_streaming()
 
         # Setup up viewport and viewing state variables
         # running traces, looks cool, but useless for the most part
@@ -130,10 +130,11 @@ class Vis(app.Canvas):
         """Start streaming data into the shared buffer.
         """
         self.logger.info("Spawning streaming process...")
-        self.__streamer = Streamer(target=self.target_path, queue=self.stream_queue, raw=self.__buf.raw)
+        self.__streamer = self.format.DataStreamer(queue=self.stream_queue, raw=self.buf.raw,
+                                                   target_path=self.target_path)
         self.__streamer._daemonic = True
+        self.stream_queue.put(('offset', 0))
         self.__streamer.start()
-        self.logger.info("Streamer started")
 
     def stop_streaming(self):
         """Stop streaming by sending stop signal to the Streamer process
@@ -141,7 +142,7 @@ class Vis(app.Canvas):
         if not self.is_streaming:
             self.logger.warning("Can't stop Streamer process: Already stopped.")
         else:
-            self.stream_queue.put(('stop',))
+            self.stream_queue.put(('stop', None))
             time.sleep(0.1)
             self.__streamer.join()
             self.logger.info("Streamer stopped")
@@ -178,7 +179,7 @@ class Vis(app.Canvas):
         # needs a copy to make memory contiguous
         idc = np.transpose(np.array([col_idc, row_idc, ch_idc], dtype='float32'))
 
-        self.program['a_position'] = self.buf
+        self.program['a_position'] = np.ones((self.n_channels, self.buffer_length), dtype=np.float32)
         self.program['a_color'] = color
         self.program['a_index'] = idc.copy()
         self.program['u_scale'] = (1., max(.1, 1. - 1 / self.n_channels))
@@ -228,9 +229,6 @@ class Vis(app.Canvas):
 
         if old_offset != self.offset:
             self.dirty = True
-            # self.logger.debug(
-            #     'Block offset: {}, @ {}'.format(self.offset, tools.fmt_time(
-            #         self.offset * self.cfg['HEADER']['block_size'] / self.fs)))
 
     @staticmethod
     def on_resize(event):
@@ -316,18 +314,13 @@ class Vis(app.Canvas):
 
     def on_timer(self, _):
         """Frame update callback."""
-        # FIXME: Sample precision positions
-
-        # if self.is_streaming:
-        #     self.q.put(('position', self.offset))
-        # # TODO: Only update the buffer if necessary!
-        # self.program['a_position'].set_data(self.__buf.get_data(0, self.n_samples))
-
         if self.dirty:
-            self._new_chunk()
+            if self.is_streaming:
+                self.stream_queue.put(('offset', self.offset))
             self.dirty = False
 
-            self.program['a_position'].set_data(self.buf)
+            data = self.buf.get_data(0, self.buffer_length)
+            self.program['a_position'].set_data(data)
 
         if self.running:
             self.set_offset(relative=1)
@@ -341,16 +334,6 @@ class Vis(app.Canvas):
     def on_close(self, _):
         self.stop_streaming()
 
-    def _new_chunk(self):
-        self.logger.debug('New chunk at offset #{}'.format(self.offset))
-        channels = list(range(self.n_channels)) if self.channel_order is None else self.channel_order[:self.n_channels]
-
-        try:
-            self.format.fill_buffer(target=self.target_path, buffer=self.buf, offset=self.offset,
-                                    channels=channels, node_id=self.cfg['FPGA_NODE'],
-                                    dtype=self.cfg['DTYPE'])
-        except BaseException as e:
-            raise e
 
 def run(*args, **kwargs):
     import argparse
@@ -383,3 +366,6 @@ def run(*args, **kwargs):
         bad_channels=bad_channels,
         dtype=cli_args.dtype)
     app.run()
+
+if __name__ == "__main__":
+    pass

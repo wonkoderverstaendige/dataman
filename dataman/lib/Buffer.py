@@ -13,15 +13,14 @@ Inspired by https://github.com/belevtsoff/rdaclient.py
 """
 
 from multiprocessing import Array
-import ctypes as c
+import ctypes as ct
 import logging
 
 import numpy as np
+logger = logging.getLogger("Buffer")
 
-
-class Buffer(object):
-    """
-    One-dimensional buffer with homogeneous elements.
+class Buffer():
+    """One-dimensional buffer with homogeneous elements.
 
     The buffer can be used simultaneously by multiple processes, because
     both data and metadata are stored in a single sharedctypes byte array.
@@ -30,88 +29,93 @@ class Buffer(object):
     processes create their own Buffer objects and initialize them so that
     all point to the same shared raw array.
     """
-
     def __init__(self):
-        self.logger = logging.getLogger("Buffer")
-        self.__initialized = False
+        self.initialized = False
+        self.raw = None
+        self.buffer = None
+        self.n_channels = None
+        self.buffer_size = None
 
     def __str__(self):
-        return self.__buf[:self.bufSize].__str__() + '\n'
+        return self.buffer[:self.buffer_size].__str__() + '\n'
 
-    def __getattr__(self, item):
-        """Overload to prevent access to the buffer attributes before
-        initialization is complete.
-        """
-        if self.__initialized:
-            return object.__getattribute__(self, item)
-        else:
-            raise BufferError(1)
+    # def __getattr__(self, item):
+    #     """Overload to prevent access to the buffer attributes before
+    #     initialization is complete.
+    #     """
+    #     if self.initialized:
+    #         return object.__getattribute__(self, item)
+    #     else:
+    #         raise BufferError(1)
 
     # -------------------------------------------------------------------------
     # PROPERTIES
 
     # read only attributes
-    is_initialized = property(lambda self: self.__initialized, None, None,
-                              'Indicates whether the buffer is initialized, read only (bool)')
-    raw = property(lambda self: self.__raw, None, None,
-                   'Raw buffer array, read only (sharedctypes, char)')
-    nChannels = property(lambda self: self.__nChannels, None, None,
-                         'Dimensionality of array in channels, read only (int)')
-    nSamples = property(lambda self: self.__nSamples, None, None,
-                        'Dimensionality of array in samples, read only (int)')
-    bufSize = property(lambda self: self.__bufSize, None, None,
-                       'Buffer size, read only (int)')
-    nptype = property(lambda self: self.__nptype, None, None,
-                      'The type of the data in the buffer, read only (string)')
+    # is_initialized = property(lambda self: self.__initialized, None, None,
+    #                           'Indicates whether the buffer is initialized, read only (bool)')
+    # raw = property(lambda self: self.__raw, None, None,
+    #                'Raw buffer array, read only (sharedctypes, char)')
+    # nChannels = property(lambda self: self.__nChannels, None, None,
+    #                      'Dimensionality of array in channels, read only (int)')
+    # nSamples = property(lambda self: self.__nSamples, None, None,
+    #                     'Dimensionality of array in samples, read only (int)')
+    # bufSize = property(lambda self: self.__bufSize, None, None,
+    #                    'Buffer size, read only (int)')
+    # nptype = property(lambda self: self.__nptype, None, None,
+    #                   'The type of the data in the buffer, read only (string)')
 
     # -------------------------------------------------------------------------
 
-    def initialize(self, nChannels, nSamples, np_type='float32'):
-        """Initializes the buffer with a new array.
-        """
+    def initialize(self, n_channels, n_samples, np_dtype='float32'):
+        """Initializes the buffer with a new array."""
+        logger.debug('Initializing {}x{} {} buffer.'.format(n_channels, n_samples, np_dtype))
 
         # check parameters
-        if nChannels < 1 or nSamples < 1:
-            self.logger.error('nChannels and nSamples must be a positive integer')
+        if n_channels < 1 or n_samples < 1:
+            logger.error('n_channels and n_samples must be a positive integer')
             raise BufferError(1)
 
-        size_bytes = c.sizeof(BufferHeader) + \
-            nSamples * nChannels * np.dtype(np_type).itemsize
+        size_bytes = ct.sizeof(BufferHeader) + n_samples * n_channels * np.dtype(np_dtype).itemsize
         raw = Array('c', size_bytes)
         hdr = BufferHeader.from_buffer(raw.get_obj())
 
-        hdr.bufSizeBytes = size_bytes - c.sizeof(BufferHeader)
-        hdr.dataType = datatypes.get_code(np_type)
-        hdr.nChannels = nChannels
-        hdr.nSamples = nSamples
+        hdr.bufSizeBytes = size_bytes - ct.sizeof(BufferHeader)
+        hdr.dataType = datatypes.get_code(np_dtype)
+        hdr.nChannels = n_channels
+        hdr.nSamples = n_samples
         hdr.position = 0
 
         self.initialize_from_raw(raw.get_obj())
 
     def initialize_from_raw(self, raw):
-        """Initiates the buffer with the compatible external raw array.
+        """Initializes the buffer with the compatible external raw array.
         All the metadata will be read from the header region of the array.
         """
-        self.__initialized = True
-        hdr = BufferHeader.from_buffer(raw)
+        logger.debug('Initializing from raw buffer {}'.format(raw))
+        self.raw = raw
+        hdr = BufferHeader.from_buffer(self.raw)
 
-        # datatype
-        np_type = datatypes.get_type(hdr.dataType)
+        # data type
+        self.np_type = datatypes.get_type(hdr.dataType)
 
-        bufOffset = c.sizeof(hdr)
-        bufFlatSize = hdr.bufSizeBytes // np.dtype(np_type).itemsize
+        bufOffset = ct.sizeof(hdr)
+        bufFlatSize = hdr.bufSizeBytes // np.dtype(self.np_type).itemsize
 
         # create numpy view object pointing to the raw array
-        self.__raw = raw
-        self.__hdr = hdr
-        self.__buf = np.frombuffer(raw, np_type, bufFlatSize, bufOffset) \
-            .reshape((-1, hdr.nSamples))
+        print('init', self.raw)
+        self.buffer_hdr = hdr
+        self.buffer = np.frombuffer(self.raw, self.np_type, bufFlatSize, bufOffset) \
+            .reshape((hdr.nChannels, -1))
 
         # helper variables
-        self.__nChannels = hdr.nChannels
-        self.__nSamples = hdr.nSamples
-        self.__bufSize = len(self.__buf)
-        self.__np_type = np_type
+        self.n_channels = hdr.nChannels
+        self.n_samples = hdr.nSamples
+        self.buffer_size = len(self.buffer)
+
+        # Ready?
+        logger.debug('Buffer with shape {}, dtype: {}'.format(self.buffer.shape, self.buffer.dtype))
+        self.initialized = True
 
     def __write_buffer(self, data, start, end=None, channel=None):
         """Writes data to buffer."""
@@ -120,19 +124,21 @@ class Buffer(object):
         if end is None:
             end = start+data.shape[1]
         if channel is None:
-            self.__buf[:, start:end] = data
+            self.buffer[:, start:end] = data
         else:
-            self.__buf[channel, start:end] = data
+            self.buffer[channel, start:end] = data
 
     def __read_buffer(self, start, end):
         """Reads data from buffer, returning view into numpy array"""
         av_error = self.check_availablility(start, end)
         if not av_error:
-            return self.__buf[:, start:end]
+            return self.buffer[:, start:end]
         else:
             raise BufferError(av_error)
 
-    def get_data(self, start, end, wprotect=True):
+    def get_data(self, start=0, end=None, wprotect=False):
+        print('Getting data from {}'.format(self.raw))
+        end = end if end is not None else self.buffer.shape[1]
         data = self.__read_buffer(start, end)
         data.setflags(write=not wprotect)
         return data
@@ -143,12 +149,13 @@ class Buffer(object):
         """
         # FIXME: Detect which case to use based on the shape of the data
         # should update the whole array at once
+        logger.debug('Putting data of shape {} at start {}'.format(data.shape, start))
         if len(data.shape) != 1:
-            if data.shape[0] != self.nChannels:
+            if data.shape != self.buffer.shape:
                 raise BufferError(4)
         else:
             data.shape = (1, len(data))
-            if channel >= self.nChannels or channel < 0:
+            if channel >= self.buffer or channel < 0:
                 raise BufferError(4)
 
         end = start + data.shape[1]
@@ -200,15 +207,15 @@ class datatypes():
     types_rev = {v: k for k, v in types.items()}
 
     @classmethod
-    def get_code(cls, ndtype):
+    def get_code(cls, np_dtype):
         """Gets buffer type code given numpy datatype
 
         Parameters
         ----------
-        ndtype : string
+        np_dtype : string
             numpy datatype (e.g. 'float32')
         """
-        return cls.types_rev[ndtype]
+        return cls.types_rev[np_dtype]
 
     @classmethod
     def get_type(cls, code):
@@ -222,7 +229,7 @@ class datatypes():
         return cls.types[code]
 
 
-class BufferHeader(c.Structure):
+class BufferHeader(ct.Structure):
     """A ctypes structure describing the buffer header
 
     Attributes
@@ -239,11 +246,11 @@ class BufferHeader(c.Structure):
         position in the data in samples
     """
     _pack_ = 1
-    _fields_ = [('bufSizeBytes', c.c_ulong),
-                ('dataType', c.c_uint),
-                ('nChannels', c.c_ulong),
-                ('nSamples', c.c_ulong),
-                ('position', c.c_ulong)]
+    _fields_ = [('bufSizeBytes', ct.c_ulong),
+                ('dataType', ct.c_uint),
+                ('nChannels', ct.c_ulong),
+                ('nSamples', ct.c_ulong),
+                ('position', ct.c_ulong)]
 
 
 class BufferError(Exception):

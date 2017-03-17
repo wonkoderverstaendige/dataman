@@ -1,15 +1,15 @@
-import sys
 import os.path as op
 from .tools import fext, path_content
 import numpy as np
 import logging
 from .open_ephys import NUM_SAMPLES
-
-logger = logging.getLogger(__name__)
+from .Streamer import Streamer
 
 FMT_NAME = 'DAT'
 ITEMSIZE = 2
 AMPLITUDE_SCALE = 1 / 2 ** 10
+
+logger = logging.getLogger("dat.py")
 
 
 def detect(base_path, pre_walk=None):
@@ -62,3 +62,25 @@ def fill_buffer(target, buffer, offset, *args, **kwargs):
         chunk = np.fromfile(dat_file, count=n_samples, dtype=dtype).reshape(-1, n_channels).T.astype(
             'float32') * AMPLITUDE_SCALE
         buffer[:] = chunk
+
+
+class DataStreamer(Streamer):
+    def __init__(self, target_path, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.target_path = target_path
+        logger.info('DAT-File Streamer Initialized at {}!'.format(target_path))
+
+    def reposition(self, offset):
+        logger.debug('Rolling to position {}'.format(offset))
+
+        n_channels = self.buffer.buffer.shape[0]
+        byte_offset = offset * n_channels * ITEMSIZE * NUM_SAMPLES
+        n_samples = n_channels * self.buffer.buffer.shape[1]
+        dtype = self.buffer.buffer.dtype
+
+        with open(self.target_path, 'rb') as dat_file:
+            dat_file.seek(byte_offset)
+            chunk = np.fromfile(dat_file, count=n_samples, dtype='int16').reshape(-1, n_channels).T.astype(
+                dtype) * AMPLITUDE_SCALE
+
+        self.buffer.put_data(chunk)
