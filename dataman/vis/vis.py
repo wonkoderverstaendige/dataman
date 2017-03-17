@@ -9,6 +9,7 @@ Multiple real-time digital signals with GLSL-based clipping.
 """
 
 import logging
+import time
 import os
 import os.path as op
 import sys
@@ -35,7 +36,7 @@ with open(os.path.join(SHADER_PATH, 'vis.frag')) as fs:
 
 class Vis(app.Canvas):
     def __init__(self, target_path, n_cols=1, n_channels=64,
-                 max_samples_visible=60000, channels=None, bad_channels=None,
+                 buffer_length=60000, channels=None, bad_channels=None,
                  default_sampling_rate=3e4, *args, **kwargs):
 
         app.Canvas.__init__(self, title='Use your wheel to zoom!', keys='interactive', size=(1920, 1080),
@@ -63,23 +64,22 @@ class Vis(app.Canvas):
             self.fs = self.cfg['HEADER']['sampling_rate']
 
         self.n_samples_total = int(self.cfg['HEADER']['n_samples'])
-        self.max_samples_visible = int(max_samples_visible)
+        self.buffer_length = int(buffer_length)
         self.duration_total = tools.fmt_time(self.n_samples_total / self.fs)
 
         # Buffer to store all the pre-loaded signals
-        self.buf = np.zeros((self.n_channels, self.max_samples_visible), dtype=np.float32)
+        self.buf = np.zeros((self.n_channels, self.buffer_length), dtype=np.float32)
 
 
         # Buffer to store all the pre-loaded signals
-        self.__buffer_size = buffer_size
         self.__buf = Buffer()
-        self.__buf.initialize(nChannels=self.n_channels, nSamples=self.n_samples, nptype='float32')
+        self.__buf.initialize(nChannels=self.n_channels, nSamples=self.buffer_length, np_type='float32')
         # self.__buf.put_data(np.zeros((self.n_channels, self.n_samples), dtype=np.float32))
 
         # Streamer to keep buffer filled
         self.__streamer = None
-        self.q = Queue()
-        self.start_streaming()
+        self.stream_queue = Queue()
+        #self.start_streaming()
 
         # Setup up viewport and viewing state variables
         # running traces, looks cool, but useless for the most part
@@ -90,10 +90,10 @@ class Vis(app.Canvas):
         self.n_cols = int(n_cols)
         self.n_rows = int(math.ceil(self.n_channels / self.n_cols))
 
-        self.logger.info('n_channels: {}, col/row: {}, buffer_size: {}, '
+        self.logger.info('n_channels: {}, col/row: {}, buffer_length: {}, '
                          ' total_samples: {}, total_duration: {}'.format(self.n_channels,
                                                                          (self.n_cols, self.n_rows),
-                                                                         self.max_samples_visible,
+                                                                         self.buffer_length,
                                                                          self.n_samples_total,
                                                                          self.duration_total))
 
@@ -117,22 +117,20 @@ class Vis(app.Canvas):
         except:
             return False
 
-    target = property(lambda self: self.__target, None, None,
-                      "Target directory/file to stream from, read-only (string)")
-    target_hdr = property(lambda self: self.__target_hdr, None, None,
-                          "Header read from one of the data files containing meta data, read-only (dict)")
-    n_channels = property(lambda self: self.__n_channels, None, None,
-                          "Number of channels in the data set, read-only (int)")
+    # target = property(lambda self: self.__target, None, None,
+    #                   "Target directory/file to stream from, read-only (string)")
+    # target_hdr = property(lambda self: self.__target_hdr, None, None,
+    #                       "Header read from one of the data files containing meta data, read-only (dict)")
+    # n_channels = property(lambda self: self.__n_channels, None, None,
+    #                       "Number of channels in the data set, read-only (int)")
     is_streaming = property(__get_is_streaming, None, None,
                             'Checks whether the data source streamer is active, read-only (bool)')
-    buffer_size = property(lambda self: self.__buffer_size, None, None,
-                           'Buffer capacity in samples, read-only (int)')
 
     def start_streaming(self):
         """Start streaming data into the shared buffer.
         """
         self.logger.info("Spawning streaming process...")
-        self.__streamer = Streamer(target=self.target, queue=self.q, raw=self.__buf.raw)
+        self.__streamer = Streamer(target=self.target_path, queue=self.stream_queue, raw=self.__buf.raw)
         self.__streamer._daemonic = True
         self.__streamer.start()
         self.logger.info("Streamer started")
@@ -141,12 +139,12 @@ class Vis(app.Canvas):
         """Stop streaming by sending stop signal to the Streamer process
         """
         if not self.is_streaming:
-            raise Exception("Streamer already stopped.")
-
-        self.q.put(('stop', ))
-        time.sleep(0.1)
-        self.__streamer.join()
-        self.logger.info("Streamer stopped")
+            self.logger.warning("Can't stop Streamer process: Already stopped.")
+        else:
+            self.stream_queue.put(('stop',))
+            time.sleep(0.1)
+            self.__streamer.join()
+            self.logger.info("Streamer stopped")
 
     def _feed_shaders(self):
         # Color of each vertex
@@ -159,7 +157,7 @@ class Vis(app.Canvas):
         group = min(self.n_channels, 4)
         color = np.repeat(np.random.uniform(size=(math.ceil(self.n_rows / 4), 3),
                                             low=.1, high=.9),
-                          self.max_samples_visible * self.n_cols * group, axis=0).astype(np.float32)
+                          self.buffer_length * self.n_cols * group, axis=0).astype(np.float32)
 
         # Signal 2D index of each vertex (row and col) and x-index (sample index
         # within each signal).
@@ -174,9 +172,9 @@ class Vis(app.Canvas):
         def flatten (l):
             return [item for sl in l for item in sl]
 
-        col_idc = flatten([[r] * self.n_rows * self.max_samples_visible for r in lr(self.n_cols)])
-        row_idc = flatten([[r] * self.max_samples_visible for r in lr(self.n_rows)]) * self.n_cols
-        ch_idc = lr(self.max_samples_visible) * self.n_channels
+        col_idc = flatten([[r] * self.n_rows * self.buffer_length for r in lr(self.n_cols)])
+        row_idc = flatten([[r] * self.buffer_length for r in lr(self.n_rows)]) * self.n_cols
+        ch_idc = lr(self.buffer_length) * self.n_channels
         # needs a copy to make memory contiguous
         idc = np.transpose(np.array([col_idc, row_idc, ch_idc], dtype='float32'))
 
@@ -185,7 +183,7 @@ class Vis(app.Canvas):
         self.program['a_index'] = idc.copy()
         self.program['u_scale'] = (1., max(.1, 1. - 1 / self.n_channels))
         self.program['u_size'] = (self.n_rows, self.n_cols)
-        self.program['u_n'] = self.max_samples_visible
+        self.program['u_n'] = self.buffer_length
 
     def _target_format(self):
         formats = [f for f in [fmt.detect(self.target_path) for fmt in [open_ephys, dat, kwik]] if f is not None]
@@ -225,8 +223,8 @@ class Vis(app.Canvas):
         self.offset += int(relative)
         if self.offset < 0:
             self.offset = 0
-        elif self.offset >= (self.n_samples_total - self.max_samples_visible) // self.cfg['HEADER']['block_size']:
-            self.offset = (self.n_samples_total - self.max_samples_visible) // self.cfg['HEADER']['block_size']
+        elif self.offset >= (self.n_samples_total - self.buffer_length) // self.cfg['HEADER']['block_size']:
+            self.offset = (self.n_samples_total - self.buffer_length) // self.cfg['HEADER']['block_size']
 
         if old_offset != self.offset:
             self.dirty = True
@@ -274,7 +272,7 @@ class Vis(app.Canvas):
 
             if event.button == 1:
                 shift_signal = dx / width
-                shift_samples = shift_signal * self.max_samples_visible
+                shift_samples = shift_signal * self.buffer_length
                 shift_offset = int(shift_samples / 1024)
                 self.set_offset(absolute=self.drag_offset - shift_offset)
 
@@ -312,24 +310,19 @@ class Vis(app.Canvas):
 
         # TODO: use y-coordinate to guesstimate the channel id + amplitude at point
         t_r = x_r * self.n_cols - math.floor(x_r * self.n_cols)
-        t_sample = (t_r * self.max_samples_visible + self.offset * self.cfg['HEADER']['block_size'])
+        t_sample = (t_r * self.buffer_length + self.offset * self.cfg['HEADER']['block_size'])
         t_sec = t_sample / self.fs
         self.logger.info('Sample {} @ {}'.format(int(t_sample), tools.fmt_time(t_sec)))
 
     def on_timer(self, _):
         """Frame update callback."""
         # FIXME: Sample precision positions
-        # FIXME: Only read in data when needed, not per frame. Duh. :D
 
         # if self.is_streaming:
         #     self.q.put(('position', self.offset))
         # # TODO: Only update the buffer if necessary!
         # self.program['a_position'].set_data(self.__buf.get_data(0, self.n_samples))
 
-        # If nothing got dirty, change nothing
-        # If scale or offset changed, move, move move
-        #   If still a healthy buffer, don't do anything
-        #   If running out of buffer, append or prepend new data
         if self.dirty:
             self._new_chunk()
             self.dirty = False
@@ -352,10 +345,12 @@ class Vis(app.Canvas):
         self.logger.debug('New chunk at offset #{}'.format(self.offset))
         channels = list(range(self.n_channels)) if self.channel_order is None else self.channel_order[:self.n_channels]
 
-        self.format.fill_buffer(target=self.target_path, buffer=self.buf, offset=self.offset,
-                                count=self.max_samples_visible, channels=channels, node_id=self.cfg['FPGA_NODE'],
-                                dtype=self.cfg['DTYPE'])
-
+        try:
+            self.format.fill_buffer(target=self.target_path, buffer=self.buf, offset=self.offset,
+                                    channels=channels, node_id=self.cfg['FPGA_NODE'],
+                                    dtype=self.cfg['DTYPE'])
+        except BaseException as e:
+            raise e
 
 def run(*args, **kwargs):
     import argparse

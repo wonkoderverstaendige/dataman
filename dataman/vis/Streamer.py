@@ -14,7 +14,8 @@ import time
 import signal
 import datetime
 from multiprocessing import Process
-from dataman.vis.reader import read_record, read_header
+from ..lib.open_ephys import read_header, read_record
+#from dataman.vis.reader import read_record, read_header
 
 from dataman.vis.Buffer import Buffer
 

@@ -1,8 +1,9 @@
 import sys
 import os.path as op
-from .tools import fext, path_content, fmt_time
+from .tools import fext, path_content
 import numpy as np
 import logging
+from .open_ephys import NUM_SAMPLES
 
 logger = logging.getLogger(__name__)
 
@@ -48,15 +49,16 @@ def config(base_path, *args, **kwargs):
             'AUDIO': None}
 
 
-def fill_buffer(target, buffer, offset, count, *args, **kwargs):
+def fill_buffer(target, buffer, offset, *args, **kwargs):
     channels = kwargs['channels']
-    byte_offset = offset * len(channels) * ITEMSIZE * 1024
-    n_samples = count * len(channels)
+    n_channels = buffer.shape[0]
+    byte_offset = offset * n_channels * ITEMSIZE * NUM_SAMPLES
+    n_samples = n_channels * buffer.shape[1]
     dtype = kwargs['dtype'] if 'dtype' in kwargs else 'int16'
 
     with open(target, 'rb') as dat_file:
         dat_file.seek(byte_offset)
-        logger.debug('offset: {}, byte_offset: {}, count: {}'.format(offset, byte_offset, count))
-        chunk = np.fromfile(dat_file, count=n_samples, dtype=dtype).reshape(-1, len(channels)).T.astype(
+        logger.debug('offset: {}, byte_offset: {}, count: {}'.format(offset, byte_offset, buffer.shape[1]))
+        chunk = np.fromfile(dat_file, count=n_samples, dtype=dtype).reshape(-1, n_channels).T.astype(
             'float32') * AMPLITUDE_SCALE
-        buffer[:count] = chunk
+        buffer[:] = chunk

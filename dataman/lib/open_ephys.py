@@ -14,6 +14,8 @@ NUM_SAMPLES = 1024  # number of samples per record
 SIZE_RECORD = 2070  # total size of record (2x1024 B samples + record header)
 REC_MARKER = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 255], dtype=np.uint8)
 
+AMPLITUDE_SCALE = 1 / 2 ** 10
+
 # data type of .continuous open ephys 0.2x file format header
 HEADER_DT = np.dtype([('Header', 'S%d' % SIZE_HEADER)])
 
@@ -48,15 +50,18 @@ def read_header(filename):
     return header_dict
 
 
-def fill_buffer(target, buffer, offset, count, *args, **kwargs):
+def fill_buffer(target, buffer, offset, *args, **kwargs):
+    count = buffer.shape[1] // NUM_SAMPLES + 1
+    logger.debug('count: {}, buffer: {} '.format(count, buffer.shape))
     channels = kwargs['channels']
     node_id = kwargs['node_id']
     for c in channels:
-        buffer[c, :count] = \
+        buffer[c, :] = \
             read_record(os.path.join(target, '{node_id}_CH{channel}.continuous'.format(
                 node_id=node_id,
                 channel=c + 1)),
-                        offset=offset)[:count]
+                        count=count,
+                        offset=offset)[:buffer.shape[1]]
 
 
 def read_segment(filename, offset, count, dtype):
@@ -71,7 +76,7 @@ def read_record(filename, offset=0, count=30, dtype=DATA_DT):
     # FIXME: Stupid undocumented magic division of return value...
     return read_segment(filename, offset=SIZE_HEADER + offset * SIZE_RECORD, count=count, dtype=dtype)['samples'] \
                .ravel() \
-               .astype(np.float32) / 2 ** 10
+               .astype(np.float32) * AMPLITUDE_SCALE
 
 
 def detect(base_path, pre_walk=None):

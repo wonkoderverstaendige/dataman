@@ -66,7 +66,7 @@ class Buffer(object):
 
     # -------------------------------------------------------------------------
 
-    def initialize(self, nChannels, nSamples, nptype='float32'):
+    def initialize(self, nChannels, nSamples, np_type='float32'):
         """Initializes the buffer with a new array.
         """
 
@@ -76,12 +76,12 @@ class Buffer(object):
             raise BufferError(1)
 
         size_bytes = c.sizeof(BufferHeader) + \
-            nSamples * nChannels * np.dtype(nptype).itemsize
+            nSamples * nChannels * np.dtype(np_type).itemsize
         raw = Array('c', size_bytes)
         hdr = BufferHeader.from_buffer(raw.get_obj())
 
         hdr.bufSizeBytes = size_bytes - c.sizeof(BufferHeader)
-        hdr.dataType = datatypes.get_code(nptype)
+        hdr.dataType = datatypes.get_code(np_type)
         hdr.nChannels = nChannels
         hdr.nSamples = nSamples
         hdr.position = 0
@@ -96,22 +96,22 @@ class Buffer(object):
         hdr = BufferHeader.from_buffer(raw)
 
         # datatype
-        nptype = datatypes.get_type(hdr.dataType)
+        np_type = datatypes.get_type(hdr.dataType)
 
         bufOffset = c.sizeof(hdr)
-        bufFlatSize = hdr.bufSizeBytes // np.dtype(nptype).itemsize
+        bufFlatSize = hdr.bufSizeBytes // np.dtype(np_type).itemsize
 
         # create numpy view object pointing to the raw array
         self.__raw = raw
         self.__hdr = hdr
-        self.__buf = np.frombuffer(raw, nptype, bufFlatSize, bufOffset) \
+        self.__buf = np.frombuffer(raw, np_type, bufFlatSize, bufOffset) \
             .reshape((-1, hdr.nSamples))
 
         # helper variables
         self.__nChannels = hdr.nChannels
         self.__nSamples = hdr.nSamples
         self.__bufSize = len(self.__buf)
-        self.__nptype = nptype
+        self.__np_type = np_type
 
     def __write_buffer(self, data, start, end=None, channel=None):
         """Writes data to buffer."""
