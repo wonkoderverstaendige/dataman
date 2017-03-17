@@ -115,8 +115,11 @@ class Vis(app.Canvas):
         #               np.tile(np.arange(self.max_samples_visible), self.n_channels)] \
         #     .astype(np.float32)
 
-        lr = lambda n: list(range(n))
-        flatten = lambda l: [item for sl in l for item in sl]
+        def lr(n):
+            return list(range(n))
+
+        def flatten (l):
+            return [item for sl in l for item in sl]
 
         col_idc = flatten([[r] * self.n_rows * self.max_samples_visible for r in lr(self.n_cols)])
         row_idc = flatten([[r] * self.max_samples_visible for r in lr(self.n_rows)]) * self.n_cols
@@ -137,7 +140,8 @@ class Vis(app.Canvas):
         if len(formats) == 1:
             fmt = formats[0]
             if 'DAT' in fmt:
-                if fmt == 'DAT-File': return dat
+                if fmt == 'DAT-File':
+                    return dat
             else:
                 if 'kwik' in fmt:
                     return kwik
@@ -255,7 +259,7 @@ class Vis(app.Canvas):
         t_sec = t_sample / self.fs
         self.logger.info('Sample {} @ {}'.format(int(t_sample), tools.fmt_time(t_sec)))
 
-    def on_timer(self, event):
+    def on_timer(self, _):
         """Frame update callback."""
         # FIXME: Sample precision positions
         # FIXME: Only read in data when needed, not per frame. Duh. :D
@@ -275,7 +279,7 @@ class Vis(app.Canvas):
 
         self.update()
 
-    def on_draw(self, event):
+    def on_draw(self, _):
         gloo.clear()
         self.program.draw('line_strip')
 
@@ -290,17 +294,19 @@ class Vis(app.Canvas):
 
 def run(*args, **kwargs):
     import argparse
-    parser = argparse.ArgumentParser('Data Visualization', prefix_chars='+',
+    parser = argparse.ArgumentParser('Data Visualization',
                                      epilog="""Use: Mousewheel/arrow keys to scroll,
                                      <Shift>/<Ctrl>+<left>/<right> for larger jumps.
                                      <Shift>/<Ctrl>+Mousewheel to scale.
                                      Use <q> or <Esc> to exit. """)
     parser.add_argument('path', help='Relative or absolute path to directory',
                         default='.', nargs='?')
-    parser.add_argument('+c', '++cols', help='Number of columns', default=1, type=int)
-    parser.add_argument('+C', '++channels', help='Number of channels', default=64, type=int)
-    parser.add_argument('+l', '++layout', help='Path to probe file defining channel order')
-    parser.add_argument('+D', '++dtype', help='Data type if needed (e.g. float32 dat files', default='int16')
+    parser.add_argument('-d', '--debug', action='store_true',
+                        help='Debug mode -- verbose output, no confirmations.')
+    parser.add_argument('-c', '--cols', help='Number of columns', default=1, type=int)
+    parser.add_argument('-C', '--channels', help='Number of channels', default=64, type=int)
+    parser.add_argument('-l', '--layout', help='Path to probe file defining channel order')
+    parser.add_argument('-D', '--dtype', help='Data type if needed (e.g. float32 dat files', default='int16')
 
     cli_args = parser.parse_args(*args)
     if 'layout' in cli_args and cli_args.layout is not None:
@@ -317,9 +323,3 @@ def run(*args, **kwargs):
         bad_channels=bad_channels,
         dtype=cli_args.dtype)
     app.run()
-
-
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    run('../../data/2014-10-30_16-07-29')
