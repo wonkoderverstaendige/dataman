@@ -262,15 +262,15 @@ class BufferError(Exception):
     def __str__(self):
         """Prints the error"""
         if self.code == 1:
-            return 'buffer is not initialized (error %s)' % repr(self.code)
+            return 'buffer is not initialized (error {})'.format(self.code)
         elif self.code in [2, 3]:
-            return 'unable to get indices (error %s)' % repr(self.code)
+            return 'unable to get indices (error {})'.format(self.code)
         elif self.code == 4:
-            return 'writing incompatible data (error %s)' % repr(self.code)
+            return 'writing incompatible data (error {})'.format(self.code)
         elif self.code == 5:
-            return 'negative index (error %s)' % repr(self.code)
+            return 'negative index (error {})'.format(self.code)
         else:
-            return '(error %s)' % repr(self.code)
+            return '(error {})'.format(self.code)
 
 
 if __name__ == '__main__':
