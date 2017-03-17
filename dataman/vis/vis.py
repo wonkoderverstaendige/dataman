@@ -14,13 +14,11 @@ import os.path as op
 import sys
 from vispy import gloo
 from vispy import app
-from vispy import util
+from vispy.util import keys
 import numpy as np
 import math
 
-from ..lib.open_ephys import read_record
 from ..lib import open_ephys, dat, kwik, tools
-
 from oio import util as oio_util
 
 # Load vertex and fragment shaders
@@ -121,7 +119,7 @@ class Vis(app.Canvas):
         self.program['a_position'] = self.buf
         self.program['a_color'] = color
         self.program['a_index'] = index
-        self.program['u_scale'] = (1., 1.)
+        self.program['u_scale'] = (1., max(.1, 1. - 1 / self.n_channels))
         self.program['u_size'] = (self.n_rows, self.n_cols)
         self.program['u_n'] = self.max_samples_visible
 
@@ -151,7 +149,9 @@ class Vis(app.Canvas):
         scale_y = scale_y_old if scale_y is None else scale_y
         scale_x_new, scale_y_new = (scale_x * factor_x,
                                     scale_y * factor_y)
-        self.program['u_scale'] = (max(1, scale_x_new), max(.05, scale_y_new))
+        u_scale = (max(1, scale_x_new), max(.05, scale_y_new))
+        self.logger.debug('u_scale:{}'.format(u_scale))
+        self.program['u_scale'] = u_scale
 
     def set_offset(self, relative=0, absolute=0):
         """ Offset in blocks of 1024 samples """
@@ -182,11 +182,11 @@ class Vis(app.Canvas):
 
             # Increase jump width
             # TODO: Jump screen-multiples?
-            if util.keys.SHIFT in event.modifiers:
+            if keys.SHIFT in event.modifiers:
                 delta = delta * 10
 
             # Jump to beginning
-            if util.keys.CONTROL in event.modifiers:
+            if keys.CONTROL in event.modifiers:
                 delta = self.n_samples_total
 
             if event.key == 'Left':
@@ -228,10 +228,10 @@ class Vis(app.Canvas):
             self.set_offset(relative=dx)
         else:
             delta = np.sign(event.delta[1]) * .05
-            if util.keys.SHIFT in event.modifiers:
+            if keys.SHIFT in event.modifiers:
                 self.set_scale(factor_x=math.exp(2.5 * delta))
 
-            elif util.keys.CONTROL in event.modifiers:
+            elif keys.CONTROL in event.modifiers:
                 self.set_scale(factor_y=math.exp(2.5 * delta))
 
         self.update()
@@ -282,13 +282,17 @@ class Vis(app.Canvas):
 
 def run(*args, **kwargs):
     import argparse
-    parser = argparse.ArgumentParser('Data Visualization', prefix_chars='+')
+    parser = argparse.ArgumentParser('Data Visualization', prefix_chars='+',
+                                     epilog="""Use: Mousewheel/arrow keys to scroll,
+                                     <Shift>/<Ctrl>+<left>/<right> for larger jumps.
+                                     <Shift>/<Ctrl>+Mousewheel to scale.
+                                     Use <q> or <Esc> to exit. """)
     parser.add_argument('path', help='Relative or absolute path to directory',
                         default='.', nargs='?')
     parser.add_argument('+c', '++cols', help='Number of columns', default=1, type=int)
     parser.add_argument('+C', '++channels', help='Number of channels', default=64, type=int)
     parser.add_argument('+l', '++layout', help='Path to probe file defining channel order')
-    parser.add_argument('++dtype', help='Data type if needed (e.g. float32 dat files', default='int16')
+    parser.add_argument('+D', '++dtype', help='Data type if needed (e.g. float32 dat files', default='int16')
 
     cli_args = parser.parse_args(*args)
     if 'layout' in cli_args and cli_args.layout is not None:
@@ -298,12 +302,12 @@ def run(*args, **kwargs):
         channels = None
         bad_channels = None
 
-    vis = Vis(op.abspath(op.expanduser(cli_args.path)),
-              n_cols=cli_args.cols,
-              n_channels=cli_args.channels,
-              channels=channels,
-              bad_channels=bad_channels,
-              dtype=cli_args.dtype)
+    Vis(op.abspath(op.expanduser(cli_args.path)),
+        n_cols=cli_args.cols,
+        n_channels=cli_args.channels,
+        channels=channels,
+        bad_channels=bad_channels,
+        dtype=cli_args.dtype)
     app.run()
 
 
