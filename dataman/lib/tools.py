@@ -132,7 +132,7 @@ def terminal_size():
     ts = os.get_terminal_size()
     return ts.lines, ts.columns
 
-def _find_getch():
+def find_getch():
     """Helper to wait for a single character press, instead of having to use raw_input() requiring Enter
     to be pressed. Should work on all OS.
 

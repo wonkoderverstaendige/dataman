@@ -23,7 +23,6 @@ def detect(base_path, pre_walk=None):
     """
     root, dirs, files = path_content(base_path) if pre_walk is None else pre_walk
 
-
     logger.debug('Detecting in dirs: {}, files: {}'.format(dirs, files))
     dat_files = [f for f in files if fext(f) == '.dat']
     logger.debug('# Dat files: {}'.format(len(dat_files)))
@@ -36,7 +35,7 @@ def detect(base_path, pre_walk=None):
 
 
 def config(base_path, *args, **kwargs):
-    if not 'n_channels' in kwargs:
+    if 'n_channels' not in kwargs:
         raise BaseException('Unknown channel number, unable to unravel flat dat file.')
 
     return {'HEADER': {'sampling_rate': None,

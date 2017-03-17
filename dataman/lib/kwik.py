@@ -3,13 +3,14 @@
 
 from __future__ import print_function
 import os
-import xml.etree.ElementTree as etree
+import xml.etree.ElementTree as ETree
 from .tools import fext, path_content
 import logging
 
 FMT_NAME = 'Kwik'
 
 logger = logging.getLogger(__name__)
+
 
 def detect(base_path, pre_walk=None):
     """Checks for existence of a kwik formatted data set in the root directory.
@@ -32,7 +33,7 @@ def format_version(base_path, pre_walk=None):
     root, dirs, files = path_content(base_path) if pre_walk is None else pre_walk
 
     if "settings.xml" in files:
-        xml_root = etree.parse(os.path.join(base_path, 'settings.xml'))
+        xml_root = ETree.parse(os.path.join(base_path, 'settings.xml'))
         version = xml_root.findall("INFO/VERSION")[0].text
         if len(version):
             return "{}_v{}".format(FMT_NAME, version if version else '???')
@@ -45,7 +46,6 @@ def config(base_path, *args, **kwargs):
             'SIGNALCHAIN': None,
             'FPGA_NODE': None,
             'AUDIO': None}
-
 
 
 def fill_buffer(target, buffer, offset, count, *args, **kwargs):

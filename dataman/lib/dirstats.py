@@ -19,6 +19,7 @@ COLUMNS = {'fname': ['F']}
 
 logger = logging.getLogger(__name__)
 
+
 class Column:
     def __init__(self, name, width=3, fmt=':', align='^', *args, **kwargs):
         self.name = name
@@ -120,11 +121,11 @@ def mk_row(row, colorized=True, cols=DEFAULT_COLS, sepr='|'):
     row_str = ''
     for c in cols:
         if c == 'fname':
-            row_str += prettify(fit_str(row[c], 28), sepr=sepr, align='<', width='28')
+            row_str += prettify(fit_str(row[c], 28), sepr=sepr, align='<', width=28)
         elif c == 'size':
             row_str += prettify(tools.fmt_size(row[c], unit='', sep='', col=True, pad=7),
 
-                                sepr=sepr, align='>', width='')
+                                sepr=sepr, align='>', width=0)
 
         elif c == 'num_files':
             row_str += prettify(row[c],
@@ -161,13 +162,13 @@ def mk_row(row, colorized=True, cols=DEFAULT_COLS, sepr='|'):
     return row_str
 
 
-getch = tools._find_getch()
+get_ch = tools.find_getch()
 
 
-def print_table(rows, color=True, page_size=-1):
-    termh, termw = tools.terminal_size()
+def print_table(rows, page_size=-1):
+    term_h, term_w = tools.terminal_size()
     if page_size is not None and page_size < 1:
-        page_size = termh - 5
+        page_size = term_h - 5
     line_length = None
     for i, row in enumerate(rows):
         row_string = mk_row(row)
@@ -178,7 +179,7 @@ def print_table(rows, color=True, page_size=-1):
         if page_size is not None and page_size > 1 and i % (page_size + 1) == 0:
             if i > 1:
                 print("[MORE]")
-                c = getch()
+                c = get_ch()
                 sys.stdout.write("\033[F")
                 if c == 'q':
                     print('\n ...{} not shown.'.format(len(rows) - i))
@@ -188,7 +189,3 @@ def print_table(rows, color=True, page_size=-1):
 
         # print current line
         print(row_string)
-
-
-if __name__ == "__main__":
-    print_table(gather('.'))
