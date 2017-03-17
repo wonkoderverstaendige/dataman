@@ -16,16 +16,15 @@ import multiprocessing as mp
 import logging
 
 from .Buffer import Buffer
-from dataman.lib.open_ephys import read_header, read_record
-from dataman.lib.tools import fmt_time
 
 logger = logging.getLogger('Streamer')
+
 
 class Streamer(mp.Process):
     def __init__(self, queue, raw, update_interval=0.02):
         super(Streamer, self).__init__()
 
-        ##### WARNING #####
+        # #### WARNING #####
         # On Windows, a logging.logger can't be added to the class
         # as loggers can't be pickled. There probably is a way around
         # using configuration dicts, but I'll stay away from that...
@@ -57,13 +56,22 @@ class Streamer(mp.Process):
 
         while self.alive:
             # Grab all messages currently in the queue
-            # FIXME: Only move to last position update
             instructions = self.__get_instructions()
-            commands = [instr[0] for instr in instructions]
-            for instr in instructions:
-                self.__execute_instruction(instr)
-                if instr[0] == 'stop':
+            stop = 'stop' in [instr[0] for instr in instructions]
+
+            # only use the last issued position update
+            last_pos_instr = [instr for instr in instructions if instr[0] == 'offset']
+            last_pos_instr = last_pos_instr[-1] if len(last_pos_instr) else []
+            sub_instr = [instr for instr in instructions if instr[0] != 'offset']
+
+            if len(last_pos_instr):
+                sub_instr.append(last_pos_instr)
+
+            for instr in sub_instr:
+                if stop:
+                    self.stop(None)
                     break
+                self.__execute_instruction(instr)
             logger.debug('Instructions: {}'.format(instructions))
             time.sleep(self.update_interval)
 
@@ -85,7 +93,7 @@ class Streamer(mp.Process):
         return cmdlets
 
     def __execute_instruction(self, instruction):
-        if len(instruction)==2 and instruction[0] in self.commands:
+        if len(instruction) == 2 and instruction[0] in self.commands:
             try:
                 self.commands[instruction[0]](instruction[1])
             except BaseException as e:
@@ -97,33 +105,11 @@ class Streamer(mp.Process):
         self.commands[command] = func
 
 
-#         channel_list = range(self.__buf.nChannels)
+# channel_list = range(self.__buf.nChannels)
 #         self.files = [(channel, os.path.join(self.target, '{}_CH{}.continuous'.format(proc_node, channel + 1)))
 #                       for channel in channel_list]
 #         self.target_header = read_header(self.files[0][1])
 
-#     def run(self):
-#         """Main streaming loop."""
-#         cmd = self.__get_cmd()
-#         self.logger.info("Started streaming")
-#
-#         # ignore CTRL+C, runs daemonic, will stop with parent
-#         signal.signal(signal.SIGINT, signal.SIG_IGN)
-#
-#         while cmd != 'stop':
-#             # Grab all messages currently in the queue
-#             messages = self.__get_cmd()
-#             pos_changes = [msg[1] for msg in messages if msg[0] == 'position' and msg[1] is not None]
-#             last_pos = pos_changes[-1] if len(pos_changes) else self.position
-#             cmd = 'stop' if 'stop' in [msg[0] for msg in messages if msg[0] != 'position'] else None
-#
-#             if last_pos is not None and self.position != last_pos:
-#                 self.position = last_pos
-#
-#                 # READ IN DATA
-#                 # TODO: Here be worker pool of threads/processes grabbing data into the shared buffer
-#                 # TODO: Avoid extra copy of data by having Buffer return view on array and write in place
-#                 t = time.time()
 #                 for sf in self.files:
 #                     data = read_record(sf[1], offset=self.position)[:self.__buf.nSamples]
 #                     self.__buf.put_data(data, channel=sf[0])
@@ -131,8 +117,6 @@ class Streamer(mp.Process):
 #                                   format(self.__buf.nChannels,
 #                                          fmt_time(self.position * 1024 / self.target_header['sampleRate']),
 #                                          (time.time() - t) * 1000))
-
-#
 
 if __name__ == "__main__":
     pass

@@ -73,7 +73,6 @@ class Vis(app.Canvas):
         # Buffer to store all the pre-loaded signals
         self.buf = Buffer()
         self.buf.initialize(n_channels=self.n_channels, n_samples=self.buffer_length, np_dtype='float32')
-        print(self.buf.raw)
         # self.buf.put_data(np.zeros((self.n_channels, self.buffer_length), dtype=np.float32))
 
         # Streamer to keep buffer filled
@@ -170,7 +169,7 @@ class Vis(app.Canvas):
         def lr(n):
             return list(range(n))
 
-        def flatten (l):
+        def flatten(l):
             return [item for sl in l for item in sl]
 
         col_idc = flatten([[r] * self.n_rows * self.buffer_length for r in lr(self.n_cols)])
@@ -248,7 +247,7 @@ class Vis(app.Canvas):
             # Increase jump width
             # TODO: Jump screen-multiples?
             if keys.SHIFT in event.modifiers:
-                delta = delta * 10
+                delta *= 10
 
             # Jump to beginning
             if keys.CONTROL in event.modifiers:
@@ -278,7 +277,7 @@ class Vis(app.Canvas):
                 self.set_scale(scale_x=1.0 * math.exp(dx / width),
                                scale_y=1.0 * math.exp(dy / height))
 
-    def on_mouse_press(self, event):
+    def on_mouse_press(self, _):
         self.drag_offset = self.offset
 
     def on_mouse_wheel(self, event):
@@ -366,6 +365,7 @@ def run(*args, **kwargs):
         bad_channels=bad_channels,
         dtype=cli_args.dtype)
     app.run()
+
 
 if __name__ == "__main__":
     pass

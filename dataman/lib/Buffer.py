@@ -19,7 +19,8 @@ import logging
 import numpy as np
 logger = logging.getLogger("Buffer")
 
-class Buffer():
+
+class Buffer:
     """One-dimensional buffer with homogeneous elements.
 
     The buffer can be used simultaneously by multiple processes, because
@@ -81,7 +82,7 @@ class Buffer():
         hdr = BufferHeader.from_buffer(raw.get_obj())
 
         hdr.bufSizeBytes = size_bytes - ct.sizeof(BufferHeader)
-        hdr.dataType = datatypes.get_code(np_dtype)
+        hdr.dataType = DataTypes.get_code(np_dtype)
         hdr.nChannels = n_channels
         hdr.nSamples = n_samples
         hdr.position = 0
@@ -97,15 +98,14 @@ class Buffer():
         hdr = BufferHeader.from_buffer(self.raw)
 
         # data type
-        self.np_type = datatypes.get_type(hdr.dataType)
+        self.np_type = DataTypes.get_type(hdr.dataType)
 
         bufOffset = ct.sizeof(hdr)
-        bufFlatSize = hdr.bufSizeBytes // np.dtype(self.np_type).itemsize
+        buf_flat_size = hdr.bufSizeBytes // np.dtype(self.np_type).itemsize
 
         # create numpy view object pointing to the raw array
-        print('init', self.raw)
         self.buffer_hdr = hdr
-        self.buffer = np.frombuffer(self.raw, self.np_type, bufFlatSize, bufOffset) \
+        self.buffer = np.frombuffer(self.raw, self.np_type, buf_flat_size, bufOffset) \
             .reshape((hdr.nChannels, -1))
 
         # helper variables
@@ -137,7 +137,6 @@ class Buffer():
             raise BufferError(av_error)
 
     def get_data(self, start=0, end=None, wprotect=False):
-        print('Getting data from {}'.format(self.raw))
         end = end if end is not None else self.buffer.shape[1]
         data = self.__read_buffer(start, end)
         data.setflags(write=not wprotect)
@@ -198,7 +197,7 @@ class Buffer():
         # return 0
 
 
-class datatypes():
+class DataTypes:
     """A helper class to interpret the type code read from buffer header.
     To add new supported data types, add them to the 'type' dictionary
     """
@@ -281,26 +280,4 @@ class BufferError(Exception):
 
 
 if __name__ == '__main__':
-    buf1 = Buffer()
-    buf2 = Buffer()
-
-    buf1.initialize(2, 15)
-    buf2.initialize_from_raw(buf1.raw)
-
-    buf1.put_data(np.array([[1, 2], [3, 4]]))
-    buf2.put_data(np.array([[5, 6], [7, 8]]), start=2)
-
-    print(buf1)
-    print(buf2)
-
-    try:
-        dat = buf2.get_data(0, 5)
-        dat[1, 4] = 9
-    except ValueError:
-        print("Write protected view on array")
-
-    dat = buf2.get_data(0, 5, wprotect=False)
-    dat[1, 4] = 9
-
-    print(buf1)
-    print(buf2)
+    pass
