@@ -3,20 +3,12 @@ try:
 except ImportError:
     from distutils.core import setup
 
-config = {
-        'description': 'Data Manager',
-        'author': 'Ronny Eichler',
-        'author_email': 'reichler@science.ru.nl',
-        'version': '0.0.2dev',
-        'install_requires': ['nose', 'termcolor', 'numpy', 'vispy'],
-        'extra-requires': {'vis': 'PyQt4'},
-        'packages': ['dataman'],
-        'name': 'dataman',
-        'entry_points': """
-            [console_scripts]
-            dm=dataman.__main__:main
-        """
-        }
-
-setup(**config)
-
+setup(name='dataman',
+      description='Data Manager',
+      author='Ronny Eichler',
+      author_email='ronny.eichler@gmail.com',
+      version='0.1.1',
+      install_requires=['nose', 'termcolor', 'vispy', 'numpy'],
+      packages=['dataman'],
+      entry_points="""[console_scripts]
+            dm=dataman.dataman:main""")

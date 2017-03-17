@@ -1,70 +1,139 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import logging
 import sys
+import cmd
+import logging
+import argparse
+import os.path as op
 
-from dataman.cli.cli import DataManCLI
-from dataman.lib.constants import LOG_LEVEL_VERBOSE
+from .lib.constants import LOG_LEVEL_VERBOSE
 
-__version__ = '0.02dev'
+__version__ = '0.1.1'
 
 NO_EXIT_CONFIRMATION = True
-DEFAULT_LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.INFO
+log_level = LOG_LEVEL
+
+
+class DataMan(cmd.Cmd):
+    """Command line tool for quick data documentation."""
+
+    prompt = "dm> "
+    intro = "Data Manager\n"
+
+    log = logging.getLogger(__name__)
+
+    def preloop(self):
+        self.log.debug("Starting DataMan CLI")
+
+    def do_ls(self, line):
+        parser = argparse.ArgumentParser('Recording statistics',)
+        parser.add_argument('path', help='Relative or absolute path to directory',
+                            default='.', nargs='?')
+        parser.add_argument('-d', '--debug', action='store_true',
+                            help='Debug mode -- verbose output, no confirmations.')
+
+        cli_args = parser.parse_args(line.split(' ') if line else '')
+        self.log.debug('ls with args: {}'.format(cli_args))
+        path = op.abspath(op.expanduser(cli_args.path))
+        self.log.debug('Expanded path: {}'.format(path))
+
+        import dataman.lib.dirstats as ds
+        ds.print_table(ds.gather(path))
+
+    def do_stats(self, line):
+        parser = argparse.ArgumentParser('Recording statistics')
+        parser.add_argument('path', help='Relative or absolute path to directory',
+                            default='.', nargs='?')
+        parser.add_argument('-d', '--debug', action='store_true',
+                            help='Debug mode -- verbose output, no confirmations.')
+        cli_args = parser.parse_args(line.split(' ') if line else '')
+        self.log.debug('Stats with args: {}'.format(cli_args))
+        path = op.abspath(op.expanduser(cli_args.path))
+        self.log.debug('Expanded path: {}'.format(path))
+
+        import dataman.lib.dirstats as ds
+        ds.print_table(ds.gather(path))
+
+    def do_vis(self, line):
+        from dataman.vis import vis
+        vis.run(line.split(' '))
+
+    def do_convert(self, line):
+        pass
+
+    def do_check(self, line):
+        pass
+
+    def do_proc(self, line):
+        print(sys.argv)
+
+    def do_exit(self, line):
+        """Exit"""
+        return True
+
+    def do_EOF(self, line):
+        """Exit"""
+        return True
+
+    def postloop(self):
+        print("Done.")
 
 
 def main():
     # Command line parsing
-    import argparse
+    parser = argparse.ArgumentParser(prog="DataMan", add_help=False, usage='''
+    dm <command> [<args>]
 
-    parser = argparse.ArgumentParser(prog="DataMan")
+    Currently implemented commands:
+        cli     Interactive CLI
+        ls      Basic target statistics
+        vis     Simple data visualizer
+        ''')
+    parser.add_argument('command', help='Command to execute', nargs='?', default=None)
     parser.add_argument('-d', '--debug', action='store_true',
                         help='Debug mode -- verbose output, no confirmations.')
     parser.add_argument('--version', action='version', version='%(prog)s {version}'.format(version=__version__))
+    parser.add_argument('-h', '--help', action='store_true', help='Show help text.')
 
-    # sub-parsers
-    subparsers = parser.add_subparsers(help='sub commands', dest='command')
+    cli_args, cmd_args = parser.parse_known_args()
 
-    # CLI
-    parser_cli = subparsers.add_parser('cli', help='Interactive CLI session')
+    if cli_args.command is None and cli_args.help:
+        parser.print_help()
+        sys.exit(0)
 
-    # STATS
-    parser_stats = subparsers.add_parser('stats', help='Dataset statistics.')
-    parser_stats.add_argument('path', help='Relative or absolute path to directory',
-                              default='.', nargs='?')
+    if cli_args.debug:
+        NO_EXIT_CONFIRMATION = True
 
-    # LS
-    parser_ls = subparsers.add_parser('ls', help='Directory listing with basic stats (e.g. size)')
-    parser_ls.add_argument('path', help='Relative or absolute path to directory',
-                           default='.', nargs='?')
+    # we need to re-append arguments that should go down the rabbit hole
+    if cli_args.help:
+        cmd_args.append('-h')
+    if cli_args.debug:
+        cmd_args.append('-d')
 
-    # VIS
-    parser_vis = subparsers.add_parser('vis', help='Launch simple visualizer on dataset')
-    parser_vis.add_argument('path', help='Relative or absolute path to directory',
-                            default='.', nargs='?')
-
-    # PROC, DOC, CHECK
-    parser_proc = subparsers.add_parser('proc', help='Data processing')
-    parser_doc = subparsers.add_parser('doc', help='Data documentation')
-    parser_check = subparsers.add_parser('check', help='Check/verify data and documentation integrity')
-
-    cli_args = parser.parse_args()
-
-    log_level = LOG_LEVEL_VERBOSE if cli_args is not None and cli_args.debug else DEFAULT_LOG_LEVEL
-    logging.addLevelName(LOG_LEVEL_VERBOSE, "VERBOSE")
+    logging.addLevelName(LOG_LEVEL_VERBOSE, 'VERBOSE')
+    log_level = LOG_LEVEL_VERBOSE if cli_args.debug else LOG_LEVEL
     logging.basicConfig(level=log_level,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    log = logging.getLogger(__name__)
+    logger = logging.getLogger(__name__)
 
+    logger.debug('CLI_ARGS: {}'.format(cli_args))
+    logger.debug('CMD_ARGS: {}'.format(cmd_args))
+
+    # start cli
     if cli_args.command in [None, 'cli']:
+        logger.debug('Starting CLI via command: {}'.format(cli_args.command))
         try:
-            DataManCLI().cmdloop()
+            DataMan().cmdloop()
         except KeyboardInterrupt:
             pass
+
+    # some other command was given
     else:
-        DataManCLI().onecmd(' '.join(sys.argv[1:]))
+        logger.debug('Command {}, args: {:}'.format(cli_args.command, ' '.join(cmd_args)))
+        DataMan().onecmd('{} {}'.format(cli_args.command, ' '.join(cmd_args)))
 
 
 if __name__ == "__main__":
     main()
-

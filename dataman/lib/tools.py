@@ -1,30 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
-from __future__ import division
-import re
 import os
-import datetime
+import re
 from termcolor import colored
+import logging
 
-
-ansi_escape = re.compile(r'\x1b[^m]*m')
-
-
-def sample_to_time(sample, sampling_rate):
-    return sample/sampling_rate
-
-
-def fmt_seconds(seconds):
-    """Format seconds as a timestamp in HH:MM:SS.uuu format.
-    Parameters:
-        seconds : float
-    """
-    seconds, milliseconds = divmod(seconds, 1.)
-    td = datetime.timedelta(seconds=seconds)
-    return '{:0>8}.{:.3f}'.format(td, milliseconds)
-
+logger = logging.getLogger(__name__)
 
 def fmt_size(num, unit='B', si=True, sep=' ', col=False, pad=0):
     colors = {"k": "blue", "M": "green", "G": "red", "T": "cyan",
@@ -45,6 +27,27 @@ def fmt_size(num, unit='B', si=True, sep=' ', col=False, pad=0):
         num /= divisor
 
 
+def fmt_time(s, minimal=True):
+    """
+    Args:
+        s: time in seconds (float for fractional)
+        minimal: Flag, if true, only return strings for times > 0, leave rest outs
+    Returns: String formatted 99h 59min 59.9s, where elements < 1 are left out optionally.
+
+    """
+    ms = s-int(s)
+    s = int(s)
+    if s < 60 and minimal:
+        return "{s:02.3f}s".format(s=s+ms)
+
+    m, s = divmod(s, 60)
+    if m < 60 and minimal:
+        return "{m:02d}min {s:02.3f}s".format(m=m, s=s+ms)
+
+    h, m = divmod(m, 60)
+    return "{h:02d}h {m:02d}min {s:02.3f}s".format(h=h, m=m, s=s+ms)
+
+
 def fext(fname):
     """Grabs the file extension of a file.
 
@@ -60,20 +63,35 @@ def fext(fname):
     return os.path.splitext(fname)[1]
 
 
-def dir_content(path):
+def full_path(path):
+    """Return full path of a potentially relative path, including ~ expansion.
+
+    Args:
+        Path
+
+    Returns:
+        Absolute(Expanduser(Path))
+    """
+    return os.path.abspath(os.path.expanduser(path))
+
+def path_content(path):
     """Gathers root and first level content of a directory.
 
     Args:
         path: Relative or absolute path to a directory.
 
     Returns:
-        A tuple containing the root directory, the directories and the files
+        A tuple containing the root path, the directories and the files
         contained in the root directory.
 
-        (dirpath, dirnames, filenames)
-    """ 
-    return next(os.walk(path))
-
+        (path, dir_names, file_names)
+    """
+    path = full_path(path)
+    assert(os.path.exists(path))
+    if os.path.isdir((path)):
+        return next(os.walk(path))
+    else:
+        return os.path.basename(path), [], [path]
 
 def dir_size(path):
     """Calculate size of directory including all subdirectories and files
@@ -84,6 +102,11 @@ def dir_size(path):
     Returns:
         Integer value of size in Bytes.
     """
+    logger.debug('dir_size path: {}'.format(path))
+    assert os.path.exists(path)
+    if not os.path.isdir(path):
+        return os.path.getsize(path)
+
     total_size = 0
     for root, dirs, files in os.walk(path):
         for f in files:
@@ -95,7 +118,6 @@ def dir_size(path):
                 pass
     return total_size
 
-
 def terminal_size():
     """Get size of currently used terminal. In many cases this is inaccurate.
 
@@ -105,8 +127,10 @@ def terminal_size():
     Raises:
         Unknown error when not run from a terminal.
     """
-    return map(int, os.popen('stty size', 'r').read().split())
-
+    # return map(int, os.popen('stty size', 'r').read().split())
+    # Python 3.3+
+    ts = os.get_terminal_size()
+    return ts.lines, ts.columns
 
 def find_getch():
     """Helper to wait for a single character press, instead of having to use raw_input() requiring Enter
@@ -115,6 +139,7 @@ def find_getch():
     Returns:
         Function that works as blocking single character input without prompt.
     """
+    # FIXME: Find where I took this piece of code from... and attribute. SO perhaps?
     try:
         import termios
     except ImportError:
@@ -123,9 +148,7 @@ def find_getch():
         return msvcrt.getch
 
     # POSIX system. Create and return a getch that manipulates the tty.
-    import sys
-    import tty
-
+    import sys, tty
     def _getch():
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
@@ -139,6 +162,7 @@ def find_getch():
     return _getch
 
 
+ansi_escape = re.compile(r'\x1b[^m]*m')
 def strip_ansi(string):
     """Remove the ANSI codes (e.g. color and additional formatting) from a string.
 

@@ -1,1 +1,1 @@
-__author__ = 'reichler'
+__author__ = 'Ronny Eichler'
