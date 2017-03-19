@@ -17,10 +17,10 @@ import ctypes as ct
 import logging
 
 import numpy as np
-logger = logging.getLogger("Buffer")
+logger = logging.getLogger("SharedBuffer")
 
 
-class Buffer:
+class SharedBuffer:
     """One-dimensional buffer with homogeneous elements.
 
     The buffer can be used simultaneously by multiple processes, because
@@ -32,10 +32,13 @@ class Buffer:
     """
     def __init__(self):
         self.initialized = False
+        self.n_channels = None
+        self.n_samples = None
         self.raw = None
         self.buffer = None
-        self.n_channels = None
+        self.buffer_hdr = None
         self.buffer_size = None
+        self.np_type = None
 
     def __str__(self):
         return self.buffer[:self.buffer_size].__str__() + '\n'
@@ -75,13 +78,13 @@ class Buffer:
         # check parameters
         if n_channels < 1 or n_samples < 1:
             logger.error('n_channels and n_samples must be a positive integer')
-            raise BufferError(1)
+            raise SharedBufferError(1)
 
-        size_bytes = ct.sizeof(BufferHeader) + n_samples * n_channels * np.dtype(np_dtype).itemsize
+        size_bytes = ct.sizeof(SharedBufferHeader) + n_samples * n_channels * np.dtype(np_dtype).itemsize
         raw = Array('c', size_bytes)
-        hdr = BufferHeader.from_buffer(raw.get_obj())
+        hdr = SharedBufferHeader.from_buffer(raw.get_obj())
 
-        hdr.bufSizeBytes = size_bytes - ct.sizeof(BufferHeader)
+        hdr.bufSizeBytes = size_bytes - ct.sizeof(SharedBufferHeader)
         hdr.dataType = DataTypes.get_code(np_dtype)
         hdr.nChannels = n_channels
         hdr.nSamples = n_samples
@@ -95,17 +98,17 @@ class Buffer:
         """
         logger.debug('Initializing from raw buffer {}'.format(raw))
         self.raw = raw
-        hdr = BufferHeader.from_buffer(self.raw)
+        hdr = SharedBufferHeader.from_buffer(self.raw)
 
         # data type
         self.np_type = DataTypes.get_type(hdr.dataType)
 
-        bufOffset = ct.sizeof(hdr)
+        buf_offset = ct.sizeof(hdr)
         buf_flat_size = hdr.bufSizeBytes // np.dtype(self.np_type).itemsize
 
         # create numpy view object pointing to the raw array
         self.buffer_hdr = hdr
-        self.buffer = np.frombuffer(self.raw, self.np_type, buf_flat_size, bufOffset) \
+        self.buffer = np.frombuffer(self.raw, self.np_type, buf_flat_size, buf_offset) \
             .reshape((hdr.nChannels, -1))
 
         # helper variables
@@ -130,11 +133,11 @@ class Buffer:
 
     def __read_buffer(self, start, end):
         """Reads data from buffer, returning view into numpy array"""
-        av_error = self.check_availablility(start, end)
+        av_error = self.check_availability(start, end)
         if not av_error:
             return self.buffer[:, start:end]
         else:
-            raise BufferError(av_error)
+            raise SharedBufferError(av_error)
 
     def get_data(self, start=0, end=None, wprotect=False):
         end = end if end is not None else self.buffer.shape[1]
@@ -151,16 +154,16 @@ class Buffer:
         logger.debug('Putting data of shape {} at start {}'.format(data.shape, start))
         if len(data.shape) != 1:
             if data.shape != self.buffer.shape:
-                raise BufferError(4)
+                raise SharedBufferError(4)
         else:
             data.shape = (1, len(data))
             if channel >= self.buffer or channel < 0:
-                raise BufferError(4)
+                raise SharedBufferError(4)
 
         end = start + data.shape[1]
         self.__write_buffer(data, start, end, channel)
 
-    def check_availablility(self, start, end):
+    def check_availability(self, start, end):
         """Checks whether the requested data samples are available.
 
         Parameters
@@ -186,6 +189,7 @@ class Buffer:
         if start < end:
             return 0
         else:
+            print(self.buffer.shape)
             return
         # if sampleStart < 0 or sampleEnd <= 0:
         #     return 5
@@ -228,7 +232,7 @@ class DataTypes:
         return cls.types[code]
 
 
-class BufferHeader(ct.Structure):
+class SharedBufferHeader(ct.Structure):
     """A ctypes structure describing the buffer header
 
     Attributes
@@ -252,7 +256,7 @@ class BufferHeader(ct.Structure):
                 ('position', ct.c_ulong)]
 
 
-class BufferError(Exception):
+class SharedBufferError(Exception):
     """Represents different types of buffer errors"""
 
     def __init__(self, code):
