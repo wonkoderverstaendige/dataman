@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys
+import argparse
 import cmd
 import logging
-import argparse
 import os.path as op
+import sys
 
 from .lib.constants import LOG_LEVEL_VERBOSE
 
@@ -39,7 +39,7 @@ class DataMan(cmd.Cmd):
         path = op.abspath(op.expanduser(cli_args.path))
         self.log.debug('Expanded path: {}'.format(path))
 
-        import dataman.lib.dirstats as ds
+        import dataman.dirstats.dirstats as ds
         ds.print_table(ds.gather(path))
 
     def do_stats(self, line):
@@ -53,7 +53,7 @@ class DataMan(cmd.Cmd):
         path = op.abspath(op.expanduser(cli_args.path))
         self.log.debug('Expanded path: {}'.format(path))
 
-        import dataman.lib.dirstats as ds
+        import dataman.dirstats.dirstats as ds
         ds.print_table(ds.gather(path))
 
     def do_vis(self, line):

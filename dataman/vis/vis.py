@@ -1,12 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# vispy: gallery 2
+# Based on vispy gallery example "realtime signals"
 # Copyright (c) 2015, Vispy Development Team.
-# Distributed under the (new) BSD License. See LICENSE.txt for more info.
-
-"""
-Multiple real-time digital signals with GLSL-based clipping.
-"""
+# Distributed under the (new) BSD License.
 
 import logging
 import math
@@ -15,15 +11,14 @@ import os.path as op
 import sys
 import time
 from multiprocessing import Queue
-
 import numpy as np
 from oio import util as oio_util
-from vispy import app
-from vispy import gloo
+from oio.formats import open_ephys, kwik, dat
+from oio.lib import tools, SharedBuffer
+
+from vispy import app, gloo
 from vispy.util import keys
 
-from dataman.lib.SharedBuffer import SharedBuffer
-from ..lib import open_ephys, dat, kwik, tools
 
 # Load vertex and fragment shaders
 SHADER_PATH = os.path.join(os.path.dirname(__file__), 'shaders')
@@ -59,7 +54,7 @@ class Vis(app.Canvas):
         self.duration_total = tools.fmt_time(self.n_samples_total / self.fs)
 
         # Buffer to store all the pre-loaded signals
-        self.buf = SharedBuffer()
+        self.buf = SharedBuffer.SharedBuffer()
         self.buffer_length = BUFFER_LENGTH
         self.buf.initialize(n_channels=self.n_channels, n_samples=self.buffer_length, np_dtype=BUFFER_DTYPE)
 
@@ -98,17 +93,8 @@ class Vis(app.Canvas):
         self.show()
 
     def __get_is_streaming(self):
-        # try:
         return self.streamer.is_alive()
-        # except:
-        #     return False
 
-    # target = property(lambda self: self.__target, None, None,
-    #                   "Target directory/file to stream from, read-only (string)")
-    # target_hdr = property(lambda self: self.__target_hdr, None, None,
-    #                       "Header read from one of the data files containing meta data, read-only (dict)")
-    # n_channels = property(lambda self: self.__n_channels, None, None,
-    #                       "Number of channels in the data set, read-only (int)")
     is_streaming = property(__get_is_streaming, None, None,
                             'Checks whether the data source streamer is active, read-only (bool)')
 

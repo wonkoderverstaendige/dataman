@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
+import logging
 import os
 import sys
+from oio.formats import open_ephys, kwik, dat
+from oio.lib import tools
 from termcolor import colored
-from . import tools, open_ephys, dat, kwik
-from .tools import fext, path_content
-import logging
 
 EXT_VIDEO = ['.avi', '.mp4', '.mkv', '.wmv']
 EXT_SOUND = ['.wav', '.mp3', '.snd', '.wma']
@@ -57,7 +57,7 @@ def contains_data(path, pre_walk=None):
 
 def dir_details(path, pre_walk=None):
     logger.debug('dir_details path: {}, pre_walked: {}'.format(path, pre_walk is not None))
-    root, dirs, files = path_content(path) if pre_walk is None else pre_walk
+    root, dirs, files = tools.path_content(path) if pre_walk is None else pre_walk
 
     # Sizes
     name = os.path.basename(path)
@@ -65,10 +65,10 @@ def dir_details(path, pre_walk=None):
 
     # File type counts
     num_files = len(files)
-    num_vid = len([f for f in files if fext(f) in EXT_VIDEO])
-    num_img = len([f for f in files if fext(f) in EXT_IMAGE])
-    num_snd = len([f for f in files if fext(f) in EXT_SOUND])
-    num_doc = len([f for f in files if fext(f) in EXT_DOC])
+    num_vid = len([f for f in files if tools.fext(f) in EXT_VIDEO])
+    num_img = len([f for f in files if tools.fext(f) in EXT_IMAGE])
+    num_snd = len([f for f in files if tools.fext(f) in EXT_SOUND])
+    num_doc = len([f for f in files if tools.fext(f) in EXT_DOC])
     data_fmt = contains_data(path, pre_walk=(root, dirs, files))
 
     return dict(fname=name, size=size, num_files=num_files, num_vid=num_vid,
@@ -91,7 +91,7 @@ def gather(path):
         to the details of a single directory (including the given as
         [path]) in a dictionary.
     """
-    root, dirs, files = path_content(path)
+    root, dirs, files = tools.path_content(path)
 
     details = [dir_details(root)]
     for d in dirs:
