@@ -7,15 +7,12 @@ Created on Sep 24, 2015 15:32
 
 Stream data to buffer
 """
-
-import logging
-import os
 import signal
 import time
 import multiprocessing as mp
 import logging
 
-from .Buffer import Buffer
+from .SharedBuffer import SharedBuffer
 
 logger = logging.getLogger('Streamer')
 
@@ -30,7 +27,7 @@ class Streamer(mp.Process):
         # using configuration dicts, but I'll stay away from that...
         # self.logger = logging.getLogger(__name__)
         # self.logger = mp.log_to_stderr()
-        logger.info('{} process initializing'.format(self.name))
+        logger.debug('{} process initializing'.format(self.name))
 
         # # Queue Interface
         self.commands = {'stop': self.stop,
@@ -41,7 +38,7 @@ class Streamer(mp.Process):
 
         # Shared Buffer
         self.raw = raw
-        self.buffer = Buffer()
+        self.buffer = SharedBuffer()
 
         # # Data specifics
         self.offset = None
@@ -50,7 +47,7 @@ class Streamer(mp.Process):
         """Main streaming loop."""
         # ignore CTRL+C, runs daemonic, will stop with parent
         signal.signal(signal.SIGINT, signal.SIG_IGN)
-        logger.info('Running...')
+        logger.debug('Running...')
 
         self.buffer.initialize_from_raw(self.raw)
 
@@ -76,7 +73,7 @@ class Streamer(mp.Process):
             time.sleep(self.update_interval)
 
     def stop(self, _):
-        logger.info('Received Stop Signal')
+        logger.debug('Received Stop Signal')
         self.alive = False
 
     def reposition(self, offset):
@@ -104,19 +101,6 @@ class Streamer(mp.Process):
     def __add_command(self, command, func):
         self.commands[command] = func
 
-
-# channel_list = range(self.__buf.nChannels)
-#         self.files = [(channel, os.path.join(self.target, '{}_CH{}.continuous'.format(proc_node, channel + 1)))
-#                       for channel in channel_list]
-#         self.target_header = read_header(self.files[0][1])
-
-#                 for sf in self.files:
-#                     data = read_record(sf[1], offset=self.position)[:self.__buf.nSamples]
-#                     self.__buf.put_data(data, channel=sf[0])
-#                 self.logger.debug('Read {} channel data at position {} in {:.0f} ms'.
-#                                   format(self.__buf.nChannels,
-#                                          fmt_time(self.position * 1024 / self.target_header['sampleRate']),
-#                                          (time.time() - t) * 1000))
 
 if __name__ == "__main__":
     pass

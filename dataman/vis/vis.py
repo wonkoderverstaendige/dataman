@@ -22,7 +22,7 @@ from vispy import app
 from vispy import gloo
 from vispy.util import keys
 
-from dataman.lib.Buffer import Buffer
+from dataman.lib.SharedBuffer import SharedBuffer
 from ..lib import open_ephys, dat, kwik, tools
 
 # Load vertex and fragment shaders
@@ -32,18 +32,15 @@ with open(os.path.join(SHADER_PATH, 'vis.vert')) as vs:
 with open(os.path.join(SHADER_PATH, 'vis.frag')) as fs:
     FRAG_SHADER = fs.read()
 
+BUFFER_DTYPE = 'float32'
+BUFFER_LENGTH = int(3e4)
+
 
 class Vis(app.Canvas):
-    def __init__(self, target_path, n_cols=1, n_channels=64,
-                 buffer_length=30000, channels=None, bad_channels=None,
-                 default_sampling_rate=3e4, *args, **kwargs):
-
+    def __init__(self, target_path, n_cols=1, channels=None, *args, **kwargs):
         app.Canvas.__init__(self, title='Use your wheel to zoom!', keys='interactive', size=(1920, 1080),
                             position=(0, 0), app='pyqt5')
         self.logger = logging.getLogger(__name__)
-
-        self.n_channels = int(n_channels)
-        self.channel_order = channels  # if None: no particular order
 
         # Target configuration (format, sampling rate, sizes...)
         self.target_path = target_path
@@ -51,32 +48,23 @@ class Vis(app.Canvas):
         self.format = self._target_format()
         self.logger.debug('Target module: {}'.format(self.format))
 
-        self.cfg = self._get_target_config()
-        if 'dtype' in kwargs:
-            self.cfg['DTYPE'] = kwargs['dtype']
+        self.cfg = self._get_target_config(*args, **kwargs)
         self.logger.debug(self.cfg)
 
-        if self.cfg['HEADER']['sampling_rate'] is None:
-            self.logger.warning('Sampling rate unknown. Assuming 30kHz.')
-            self.fs = default_sampling_rate
-        else:
-            self.fs = self.cfg['HEADER']['sampling_rate']
+        self.fs = self.cfg['HEADER']['sampling_rate']
+        self.n_channels = self.cfg['CHANNELS']['n_channels']
+        self.channel_order = channels  # if None: no particular order
 
         self.n_samples_total = int(self.cfg['HEADER']['n_samples'])
-        self.buffer_length = int(buffer_length)
         self.duration_total = tools.fmt_time(self.n_samples_total / self.fs)
 
         # Buffer to store all the pre-loaded signals
-        # self.buf = np.zeros((self.n_channels, self.buffer_length), dtype=np.float32)
-
-
-        # Buffer to store all the pre-loaded signals
-        self.buf = Buffer()
-        self.buf.initialize(n_channels=self.n_channels, n_samples=self.buffer_length, np_dtype='float32')
-        # self.buf.put_data(np.zeros((self.n_channels, self.buffer_length), dtype=np.float32))
+        self.buf = SharedBuffer()
+        self.buffer_length = BUFFER_LENGTH
+        self.buf.initialize(n_channels=self.n_channels, n_samples=self.buffer_length, np_dtype=BUFFER_DTYPE)
 
         # Streamer to keep buffer filled
-        self.__streamer = None
+        self.streamer = None
         self.stream_queue = Queue()
         self.start_streaming()
 
@@ -89,12 +77,12 @@ class Vis(app.Canvas):
         self.n_cols = int(n_cols)
         self.n_rows = int(math.ceil(self.n_channels / self.n_cols))
 
-        self.logger.info('n_channels: {}, col/row: {}, buffer_length: {}, '
-                         ' total_samples: {}, total_duration: {}'.format(self.n_channels,
-                                                                         (self.n_cols, self.n_rows),
-                                                                         self.buffer_length,
-                                                                         self.n_samples_total,
-                                                                         self.duration_total))
+        self.logger.debug('n_channels: {}, col/row: {}, buffer_length: {}, '
+                          ' total_samples: {}, total_duration: {}'.format(self.n_channels,
+                                                                          (self.n_cols, self.n_rows),
+                                                                          self.buffer_length,
+                                                                          self.n_samples_total,
+                                                                          self.duration_total))
 
         # Most of the magic happens in the vertex shader, moving the samples into "position" using
         # an affine transform based on number of columns and rows for the plot, scaling, etc.
@@ -107,14 +95,13 @@ class Vis(app.Canvas):
 
         gloo.set_state(clear_color='black', blend=True,
                        blend_func=('src_alpha', 'one_minus_src_alpha'))
-
         self.show()
 
     def __get_is_streaming(self):
-        try:
-            return self.__streamer.is_alive()
-        except:
-            return False
+        # try:
+        return self.streamer.is_alive()
+        # except:
+        #     return False
 
     # target = property(lambda self: self.__target, None, None,
     #                   "Target directory/file to stream from, read-only (string)")
@@ -128,12 +115,12 @@ class Vis(app.Canvas):
     def start_streaming(self):
         """Start streaming data into the shared buffer.
         """
-        self.logger.info("Spawning streaming process...")
-        self.__streamer = self.format.DataStreamer(queue=self.stream_queue, raw=self.buf.raw,
-                                                   target_path=self.target_path)
-        self.__streamer._daemonic = True
+        self.logger.debug("Spawning streaming process...")
+        self.streamer = self.format.DataStreamer(queue=self.stream_queue, raw=self.buf.raw,
+                                                 target_path=self.target_path)
+        self.streamer._daemonic = True
         self.stream_queue.put(('offset', 0))
-        self.__streamer.start()
+        self.streamer.start()
 
     def stop_streaming(self):
         """Stop streaming by sending stop signal to the Streamer process
@@ -143,8 +130,8 @@ class Vis(app.Canvas):
         else:
             self.stream_queue.put(('stop', None))
             time.sleep(0.1)
-            self.__streamer.join()
-            self.logger.info("Streamer stopped")
+            self.streamer.join()
+            self.logger.debug("Streamer stopped")
 
     def _feed_shaders(self):
         # Color of each vertex
@@ -157,7 +144,7 @@ class Vis(app.Canvas):
         group = min(self.n_channels, 4)
         color = np.repeat(np.random.uniform(size=(math.ceil(self.n_rows / 4), 3),
                                             low=.1, high=.9),
-                          self.buffer_length * self.n_cols * group, axis=0).astype(np.float32)
+                          self.buffer_length * self.n_cols * group, axis=0).astype('float32')
 
         # Signal 2D index of each vertex (row and col) and x-index (sample index
         # within each signal).
@@ -178,7 +165,7 @@ class Vis(app.Canvas):
         # needs a copy to make memory contiguous
         idc = np.transpose(np.array([col_idc, row_idc, ch_idc], dtype='float32'))
 
-        self.program['a_position'] = np.ones((self.n_channels, self.buffer_length), dtype=np.float32)
+        self.program['a_position'] = np.ones((self.n_channels, self.buffer_length), dtype=BUFFER_DTYPE)
         self.program['a_color'] = color
         self.program['a_index'] = idc.copy()
         self.program['u_scale'] = (1., max(.1, 1. - 1 / self.n_channels))
@@ -201,9 +188,9 @@ class Vis(app.Canvas):
         self.logger.info('Detected format(s) {} not valid.'.format(formats))
         sys.exit(0)
 
-    def _get_target_config(self):
+    def _get_target_config(self, *args, **kwargs):
         self.logger.debug('Target found: {}'.format(self.format.FMT_NAME))
-        return self.format.config(self.target_path, n_channels=self.n_channels)
+        return self.format.config(self.target_path, *args, **kwargs)
 
     def set_scale(self, factor_x=1.0, factor_y=1.0, scale_x=None, scale_y=None):
         self.dirty = True
@@ -303,7 +290,7 @@ class Vis(app.Canvas):
     def on_mouse_double_click(self, event):
         x, y = event.pos
         x_r = x / self.size[0]
-        y_r = y / self.size[1]
+        # y_r = y / self.size[1]
 
         # TODO: use y-coordinate to guesstimate the channel id + amplitude at point
         t_r = x_r * self.n_cols - math.floor(x_r * self.n_cols)
@@ -346,9 +333,9 @@ def run(*args, **kwargs):
     parser.add_argument('-d', '--debug', action='store_true',
                         help='Debug mode -- verbose output, no confirmations.')
     parser.add_argument('-c', '--cols', help='Number of columns', default=1, type=int)
-    parser.add_argument('-C', '--channels', help='Number of channels', default=64, type=int)
+    parser.add_argument('-C', '--channels', help='Number of channels', type=int)
     parser.add_argument('-l', '--layout', help='Path to probe file defining channel order')
-    parser.add_argument('-D', '--dtype', help='Data type if needed (e.g. float32 dat files', default='int16')
+    parser.add_argument('-D', '--dtype', help='Data type if needed (e.g. float32 dat files')
 
     cli_args = parser.parse_args(*args)
     if 'layout' in cli_args and cli_args.layout is not None:
