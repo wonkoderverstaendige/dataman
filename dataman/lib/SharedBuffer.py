@@ -156,9 +156,10 @@ class SharedBuffer:
             if data.shape != self.buffer.shape:
                 raise SharedBufferError(4)
         else:
-            data.shape = (1, len(data))
-            if channel >= self.buffer or channel < 0:
-                raise SharedBufferError(4)
+            data = data.reshape(1, -1)
+            # data.shape = (1, len(data))
+            # if channel >= self.buffer or channel < 0:
+            #     raise SharedBufferError(4)
 
         end = start + data.shape[1]
         self.__write_buffer(data, start, end, channel)

@@ -19,11 +19,12 @@ logger = logging.getLogger(__name__)
 
 
 class DataStreamer(Streamer):
-    def __init__(self, target_path, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, target_path, config, *args, **kwargs):
+        super(DataStreamer, self).__init__(*args, **kwargs)
         self.target_path = target_path
         self.dtype = np.dtype('int16')
         logger.debug('DAT-File Streamer Initialized at {}!'.format(target_path))
+        self.cfg = config
 
     def reposition(self, offset):
         logger.debug('Rolling to position {}'.format(offset))

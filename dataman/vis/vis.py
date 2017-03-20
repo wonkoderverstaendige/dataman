@@ -117,7 +117,7 @@ class Vis(app.Canvas):
         """
         self.logger.debug("Spawning streaming process...")
         self.streamer = self.format.DataStreamer(queue=self.stream_queue, raw=self.buf.raw,
-                                                 target_path=self.target_path)
+                                                 target_path=self.target_path, config=self.cfg)
         self.streamer._daemonic = True
         self.stream_queue.put(('offset', 0))
         self.streamer.start()
@@ -215,6 +215,7 @@ class Vis(app.Canvas):
 
         if old_offset != self.offset:
             self.dirty = True
+        self.logger.debug('Offset: {}'.format(self.offset))
 
     @staticmethod
     def on_resize(event):

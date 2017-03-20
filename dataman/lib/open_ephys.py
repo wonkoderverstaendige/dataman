@@ -34,39 +34,26 @@ DATA_DT = np.dtype([('timestamp', np.int64),  # 8 Byte
 
 
 class DataStreamer(Streamer):
-    def __init__(self, target_path, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, target_path, config, *args, **kwargs):
+        super(DataStreamer, self).__init__(*args, **kwargs)
         self.target_path = target_path
-        self.n_channels = self.buffer.buffer.shape[0]
-        self.dtype = self.buffer.np_type
-        logger.info('DAT-File Streamer Initialized at {}!'.format(target_path))
+        logger.debug('Open Ephys Streamer Initialized at {}!'.format(target_path))
+        self.cfg = config
 
     def reposition(self, offset):
         logger.debug('Rolling to position {}'.format(offset))
-        byte_offset = offset * self.n_channels * self.buffer.buffer.itemsize * NUM_SAMPLES
-        n_samples = self.buffer.buffer.size
-        dtype = self.buffer.buffer.dtype
+        dtype = np.dtype(self.buffer.np_type)
+        n_samples = self.buffer.buffer.shape[1]
 
-        with open(self.target_path, 'rb') as dat_file:
-            dat_file.seek(byte_offset)
-            chunk = np.fromfile(dat_file, count=n_samples, dtype='int16').reshape(-1, self.n_channels).T.astype(
-                dtype) * AMPLITUDE_SCALE
+        channels = range(self.buffer.n_channels)
+        self.files = [
+            (channel, os.path.join(self.target_path, '{}_CH{}.continuous'.format(self.cfg['FPGA_NODE'], channel + 1)))
+            for
+            channel in channels]
 
-        self.buffer.put_data(chunk)
-
-# channel_list = range(self.__buf.nChannels)
-#         self.files = [(channel, os.path.join(self.target, '{}_CH{}.continuous'.format(proc_node, channel + 1)))
-#                       for channel in channel_list]
-#         self.target_header = read_header(self.files[0][1])
-
-#                 for sf in self.files:
-#                     data = read_record(sf[1], offset=self.position)[:self.__buf.nSamples]
-#                     self.__buf.put_data(data, channel=sf[0])
-#                 self.logger.debug('Read {} channel data at position {} in {:.0f} ms'.
-#                                   format(self.__buf.nChannels,
-#                                          fmt_time(self.position * 1024 / self.target_header['sampleRate']),
-#                                          (time.time() - t) * 1000))
-
+        for sf in self.files:
+            data = read_record(sf[1], offset=offset)[:n_samples]
+            self.buffer.put_data(data, channel=sf[0])
 
 def read_header(filename):
     """Return dict with .continuous file header content."""
@@ -190,6 +177,15 @@ def config(base_dir, *args, **kwargs):
     cfg['FPGA_NODE'] = _fpga_node(cfg['SIGNALCHAIN'])
     cfg['HEADER'] = config_header(base_dir, cfg['FPGA_NODE'])
     cfg['DTYPE'] = DEFAULT_DTYPE
+
+    if 'n_channels' not in kwargs or kwargs['n_channels'] is None:
+        logger.warning('Channel number not given. Guessing from file names in {}...'.format(base_dir))
+        n_channels = guess_n_channels(base_dir, cfg['FPGA_NODE'])
+        logger.warning('{} seems to have {} channels'.format(base_dir, n_channels))
+    else:
+        n_channels = kwargs['n_channels']
+
+    cfg['CHANNELS'] = {'n_channels': n_channels}
     return cfg
 
 
@@ -256,3 +252,8 @@ def config_xml(base_dir):
     return dict(INFO=info,
                 SIGNALCHAIN=chain,
                 AUDIO=audio)
+
+
+def guess_n_channels(base_path, fpga_node, *args, **kwargs):
+    # FIXME: Hardcoding. Poor man's features.
+    return 64
