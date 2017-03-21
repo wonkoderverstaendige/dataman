@@ -12,18 +12,21 @@
     [ ] Non-filling channel number
     [X] Allow single channel
     [X] Rescale vertical size when few channels shown (have margin pressure)
+    [ ] Shared state Values with Streamer, update on full data load
     
 # General
     [ ] Integrate OIO
-    [ ] Subcommand overhaul (oio+dm commands)
+    [X] Subcommand overhaul (oio+dm commands)
     [ ] dm ls should return number of datasets on subfolders
     [ ] Logging verbosity with --log=INFO etc.
     [ ] dataman configuration for quick loading/inspection/overrides (dataman.conf)
-    [X] Update setup.py with literate syntax to allow requirement scaping by IDE
+    [X] Update setup.py with literate syntax to allow requirement scraping by IDE
+    [ ] Spaces in filenames
+    [ ] dead_channels -> bad_channels
 
 # LS/Stats
     [ ] Order file list by file/directory name!
     
 # Urgent
-    [ ] Holy frick, we forgot about the streaming branch!
+    [X] Holy frick, we forgot about the streaming branch!
     

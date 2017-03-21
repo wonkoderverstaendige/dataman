@@ -13,7 +13,7 @@ import time
 from multiprocessing import Queue
 import numpy as np
 from oio import util as oio_util
-from oio.formats import open_ephys, kwik, dat
+
 from oio.lib import tools, SharedBuffer
 
 from vispy import app, gloo
@@ -40,8 +40,9 @@ class Vis(app.Canvas):
         # Target configuration (format, sampling rate, sizes...)
         self.target_path = target_path
         self.logger.debug('Target path: {}'.format(target_path))
-        self.format = self._target_format()
+        self.format = oio_util.detect_format(self.target_path)
         self.logger.debug('Target module: {}'.format(self.format))
+        assert self.format is not None
 
         self.cfg = self._get_target_config(*args, **kwargs)
         self.logger.debug(self.cfg)
@@ -157,22 +158,6 @@ class Vis(app.Canvas):
         self.program['u_scale'] = (1., max(.1, 1. - 1 / self.n_channels))
         self.program['u_size'] = (self.n_rows, self.n_cols)
         self.program['u_n'] = self.buffer_length
-
-    def _target_format(self):
-        formats = [f for f in [fmt.detect(self.target_path) for fmt in [open_ephys, dat, kwik]] if f is not None]
-
-        if len(formats) == 1:
-            fmt = formats[0]
-            if 'DAT' in fmt:
-                if fmt == 'DAT-File':
-                    return dat
-            else:
-                if 'kwik' in fmt:
-                    return kwik
-                else:
-                    return open_ephys
-        self.logger.info('Detected format(s) {} not valid.'.format(formats))
-        sys.exit(0)
 
     def _get_target_config(self, *args, **kwargs):
         self.logger.debug('Target found: {}'.format(self.format.FMT_NAME))
