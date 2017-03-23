@@ -27,6 +27,9 @@ DEBUG_STR_ZEROS = 'Zeroing (Flag: {flag}) dead channel {channel}'
 MODE_STR = {'a': 'Append', 'w': "Write"}
 MODE_STR_PAST = {'a': 'Appended', 'w': "Wrote"}
 
+DEFAULT_FULL_TEMPLATE = '{prefix}--cg({cg_id:02})_ch[{crs}]'
+DEFAULT_SHORT_TEMPLATE = '{prefix}--cg({cg_id:02})'
+
 
 def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
                       file_mode='w', chunk_records=10000, duration=0,
@@ -130,39 +133,45 @@ def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
 
 def main(args):
     import argparse
-    parser = argparse.ArgumentParser("Convert file formats/layouts. Default result is int16 .dat file.")
+    parser = argparse.ArgumentParser('Convert file formats/layouts. Default result is int16 .dat file.')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help="Verbose (debug) output")
 
     # Input/output
-    parser.add_argument("target", nargs='*', default='.',
+    parser.add_argument('target', nargs='*', default='.',
                         help="""Path/list of paths to directories containing raw .continuous data OR path
                                 to .session definition file. Listing multiple files will result in data sets
                                 being concatenated in listed order.""")
-    parser.add_argument("-o", "--output", help="Output file path. Name of target if none given.")
+    parser.add_argument('-o', '--out_path', help='Output file path Defaults to current working directory')
+    parser.add_argument('-P', '--out_prefix', help='Output file prefix. Default is name of target.')
+    parser.add_argument('-T', '--template_fname',
+                        help='Output file template. Default: {}'.format(DEFAULT_SHORT_TEMPLATE))
+
     parser.add_argument('-f', '--format', help='Output format. Default is: {}'.format(list(FORMATS.keys())[2]),
                         choices=FORMATS.keys(), default=list(FORMATS.keys())[2])
+    parser.add_argument('--fname_channels', action='store_true', help='Include original channel numbers in file names.')
 
     # Channel arrangement
     channel_group = parser.add_mutually_exclusive_group()
-    channel_group.add_argument("-c", "--channel-count", type=int,
-                               help="Number of consecutive channels.")
-    channel_group.add_argument("-C", "--channel-list", nargs='*', type=int,
-                               help="List of channels in order they are to be merged.")
-    channel_group.add_argument("-l", "--layout",
+    channel_group.add_argument('-c', "--channel-count", type=int,
+                               help='Number of consecutive channels.')
+    channel_group.add_argument('-C', "--channel-list", nargs='*', type=int,
+                               help='List of channels in order they are to be merged.')
+    channel_group.add_argument('-l', '--layout',
                                help="Path to klusta .probe file.")
-    parser.add_argument("-g", "--channel-groups", type=int, nargs="+",
+    parser.add_argument('-g', '--channel-groups', type=int, nargs="+",
                         help="limit to only a subset of the channel groups")
-    parser.add_argument("-S", "--split-groups", action="store_true",
-                        help="Split channel groups into separate files.")
-    parser.add_argument("-d", "--dead-channels", nargs='*', type=int,
-                        help="List of dead channels. If flag set, these will be set to zero.")
-    parser.add_argument("-z", "--zero-dead-channels", action='store_true')
-    parser.add_argument("--dry-run", action='store_true')
+    parser.add_argument('-S', '--split-groups', action='store_true',
+                        help='Split channel groups into separate files.')
+    parser.add_argument('-d', '--dead-channels', nargs='*', type=int,
+                        help='List of dead channels. If flag set, these will be set to zero.')
+    parser.add_argument('-z', '--zero-dead-channels', action='store_true')
+    parser.add_argument('--dry-run', action='store_true', help='Do not write data files (but still create prb/prm')
     # parser.add_argument("-n", "--proc-node", help="Processor node id", type=int, default=100)
-    parser.add_argument("-p", "--params", help="Path to .params file.")
-    parser.add_argument("-D", "--duration", type=int, help="Limit duration of recording (s)")
-    parser.add_argument("--remove-trailing-zeros", action='store_true')
+    parser.add_argument('-p', "--params", help='Path to .params file.')
+    parser.add_argument('-D', "--duration", type=int, help='Limit duration of recording (s)')
+    parser.add_argument('--remove-trailing-zeros', action='store_true')
+    parser.add_argument('--out_fname_template', action='store_true', help='Template for file naming.')
 
     cli_args = parser.parse_args(args)
     logger.debug('Arguments: {}'.format(cli_args))
@@ -200,7 +209,7 @@ def main(args):
         if cli_args.split_groups:
             channel_groups = layout['channel_groups']
             if 'dead_channels' in layout:
-                if layout['dead_channels'] != dead_channels:
+                if len(dead_channels) and (layout['dead_channels'] != dead_channels):
                     raise ValueError(
                         'Conflicting bad channel lists: args: {}, layout: {}'.format(layout['dead_channels'],
                                                                                      dead_channels))
@@ -218,26 +227,27 @@ def main(args):
         channel_groups = {0: {'channels': list(range(cfg['CHANNELS']['n_channels'])),
                               'dead_channels': dead_channels}}
 
+    # Template parameter file
     prm_file_input = cli_args.params
 
-    # involved file names
-    if cli_args.output is None:
+    # Output file path
+    if cli_args.out_path is None:
         out_path = os.getcwd()
         logger.warning('Using current working directory "{}" as output path.'.format(out_path))
-        out_file, out_ext = op.basename(op.splitext(cli_args.target[0])[0]), "dat"
     else:
-        out_path, out_file = op.split(op.expanduser(cli_args.output))
-        if out_file == '':
-            out_file = op.basename(cli_args.target[0])
+        out_path = op.abspath(op.expanduser(cli_args.out_path))
 
-        out_file, out_ext = op.splitext(out_file)
-        out_ext = out_ext.strip('.')
-        if out_ext == '':
-            out_ext = 'dat'
-
+    # Create the output path if necessary
     if len(out_path) and not op.exists(out_path):
         os.mkdir(out_path)
-        logger.debug('Output path, file, extension: "{}", "{}", "{}"'.format(out_path, out_file, out_ext))
+        logger.debug('Creating output path {}'.format(out_path))
+
+    out_fext = format_output.FMT_FEXT
+    out_prefix = cli_args.out_prefix if cli_args.out_prefix is not None else op.basename(cli_args.target[0])
+    logger.debug('Prefix: {}'.format(out_prefix))
+    default_template = DEFAULT_FULL_TEMPLATE if cli_args.fname_channels else DEFAULT_SHORT_TEMPLATE
+    fname_template = default_template if cli_args.template_fname is None else cli_args.template_fname
+    logger.debug('Filename template: {}'.format(fname_template))
 
     logger.debug('Zero dead channels: {} '.format(cli_args.zero_dead_channels))
 
@@ -247,9 +257,10 @@ def main(args):
 
         crs = util.fmt_channel_ranges(channel_group['channels'])
         # TODO: Check file name length, shorten if > 256 characters
-        output_base_name = "{outfile}--cg({cg_id:02})_ch[{crs}]".format(outfile=out_file, cg_id=cg_id, crs=crs)
-        output_file_name = '.'.join([output_base_name, out_ext])
-        output_file_path = op.join(out_path, output_file_name)
+        # Possible parameters: outfile prefix [outfile], channel group id [cg_id]
+        output_basename = fname_template.format(prefix=out_prefix, cg_id=cg_id, crs=crs)
+        output_fname = ''.join([output_basename, out_fext])
+        output_file_path = op.join(out_path, output_fname)
 
         time_written = 0
         for file_mode, input_file_path in enumerate(cli_args.target):
@@ -267,24 +278,21 @@ def main(args):
                     duration=duration)
 
         # create the per-group .prb and .prm files
-        with open(op.join(out_path, output_base_name + '.prb'), 'w') as prb_out:
-            # cg_out = {cg_id: channel_group}
-            # if cli_args.zero_dead_channels:
-            #     cg_out[cg_id]['dead_channels'] = [dc for dc in dead_channels if dc in channel_group['channels']]
+        with open(op.join(out_path, output_basename + '.prb'), 'w') as prb_out:
             ch_out = channel_group['channels']
             cg_out = {0: {'channels': list(range(len(ch_out))),
                           'dead_channels': sorted([ch_out.index(dc) for dc in dead_channels if dc in ch_out])}}
             prb_out.write('channel_groups = {}'.format(pprint.pformat(cg_out)))
 
-        with open(op.join(out_path, output_base_name + '.prm'), 'w') as prm_out:
+        with open(op.join(out_path, output_basename + '.prm'), 'w') as prm_out:
             if prm_file_input:
                 f = open(prm_file_input, 'r')
                 prm_in = f.read()
                 f.close()
             else:
                 prm_in = pkgr.resource_string('config', 'default.prm').decode()
-            prm_out.write(prm_in.format(experiment_name=output_base_name,
-                                        probe_file=output_base_name + '.prb',
+            prm_out.write(prm_in.format(experiment_name=output_basename,
+                                        probe_file=output_basename + '.prb',
                                         raw_file=output_file_path,
                                         n_channels=len(channel_group['channels'])))
 

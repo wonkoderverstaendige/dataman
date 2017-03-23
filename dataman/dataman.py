@@ -8,7 +8,7 @@ import os
 import os.path as op
 import sys
 import subprocess
-import shlex
+import oio
 
 from .lib.constants import LOG_LEVEL_VERBOSE
 
@@ -38,6 +38,10 @@ class DataMan(cmd.Cmd):
 
     def preloop(self):
         self.log.debug("Starting DataMan CLI")
+
+    def precmd(self, line):
+        self.log.debug('Starting dataman v{} @git [{}]'.format(__version__, GIT_VERSION))
+        self.log.debug('Using oio v{} @git [{}]'.format(__version__, GIT_VERSION))
 
     def do_ls(self, args_string):
         parser = argparse.ArgumentParser('Recording statistics',)
@@ -76,8 +80,12 @@ class DataMan(cmd.Cmd):
 
     def do_conv(self, args_string):
         from dataman.conv import convert
-        self.log.info('Starting conversion with dataman v{} @git [{}]'.format(__version__, GIT_VERSION))
+        self.log.info('Starting conversion with dataman v{} @git [{}]'.format(oio.__version__, oio.GIT_VERSION))
         convert.main(args_string.split(' '))
+
+    def do_ref(self, args_string):
+        from dataman.ref import referencing
+        referencing.main(args_string.split(' '))
 
     def do_check(self, args_string):
         pass
@@ -109,6 +117,7 @@ def main():
         ls      Basic target statistics
         vis     Simple data visualizer
         conv    Convert formats and layouts
+        ref     Creating references/reference-subtracting data
         ''')
     parser.add_argument('command', help='Command to execute', nargs='?', default=None)
     parser.add_argument('-v', '--verbose', action='store_true',
