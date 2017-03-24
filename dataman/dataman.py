@@ -87,6 +87,10 @@ class DataMan(cmd.Cmd):
         from dataman.ref import referencing
         referencing.main(args_string.split(' '))
 
+    def do_split(self, args_string):
+        from dataman.split import split
+        split.main(args_string.split(' '))
+
     def do_check(self, args_string):
         pass
 
