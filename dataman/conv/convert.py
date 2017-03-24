@@ -185,7 +185,6 @@ def main(args):
     format_input = formats[0]
     logger.info('Input module: {}'.format(format_input.__name__))
     cfg = format_input.config(cli_args.target[0])
-    print(cfg)
 
     # Output file format
     format_output = FORMATS[cli_args.format.lower()]
@@ -196,6 +195,7 @@ def main(args):
     dead_channels = cli_args.dead_channels if cli_args.dead_channels is not None else []
 
     # One of channel_count, channel_list, layout_file path from mutex parser group channel_group
+    layout = None
     if cli_args.channel_count is not None:
         channel_groups = {0: {'channels': list(range(cli_args.channel_count)),
                               'dead_channels': dead_channels}}
@@ -218,7 +218,8 @@ def main(args):
                 channel_groups = {i: channel_groups[i] for i in cli_args.channel_groups if i in channel_groups}
         else:
             channels, dead_channels = util.flat_channel_list(layout)
-            logger.warning('Not splitting groups! Merging into flat list... ')
+            logger.warning('Not splitting groups! Creating new monotonically increasing channel map.')
+
             # make a new channel group by merging in the existing ones
             channel_groups = {0: {'channels': channels,
                                   'dead_channels': dead_channels}}
@@ -279,10 +280,16 @@ def main(args):
 
         # create the per-group .prb and .prm files
         with open(op.join(out_path, output_basename + '.prb'), 'w') as prb_out:
-            ch_out = channel_group['channels']
-            cg_out = {0: {'channels': list(range(len(ch_out))),
-                          'dead_channels': sorted([ch_out.index(dc) for dc in dead_channels if dc in ch_out])}}
+            if cli_args.split_groups or layout is None:
+                # One prb file per channel group
+                ch_out = channel_group['channels']
+                cg_out = {0: {'channels': list(range(len(ch_out))),
+                              'dead_channels': sorted([ch_out.index(dc) for dc in dead_channels if dc in ch_out])}}
+            else:
+                # Same channel groups, but with flat numbering
+                cg_out = util.monotonic_prb(layout)
             prb_out.write('channel_groups = {}'.format(pprint.pformat(cg_out)))
+
 
         with open(op.join(out_path, output_basename + '.prm'), 'w') as prm_out:
             if prm_file_input:
