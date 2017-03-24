@@ -7,7 +7,7 @@ Take a peak at the data
 
 `dm vis ~/data/2014-10-30_15-04-50`
 
-![vis screenshot](/resources/vis_64_channels.png?raw=true)
+![vis screenshot](dataman/resources/vis_64_channels.png?raw=true)
 
 ## Preparation for klusta
 
