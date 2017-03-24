@@ -56,6 +56,7 @@ def main(args):
         arr = mm.take(channel_groups[indices[id]]['channels'], axis=1)
         arr.tofile('test_{}.dat'.format(indices[id]))
 
+    del mm
     if cli_args.clean:
         logger.warning('Deleting file {}'.format(in_file))
         os.remove(in_file)
