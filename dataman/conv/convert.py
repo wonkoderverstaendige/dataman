@@ -66,11 +66,11 @@ def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
             data_files = [stack.enter_context(oe.ContinuousFile(f)) for f in data_file_paths]
             ref_files = [stack.enter_context(oe.ContinuousFile(f)) for f in ref_file_paths]
             for oe_file in data_files:
-                logger.info("Open data file: {}".format(op.basename(oe_file.path)) +
-                            LOG_STR_ITEM.format(header=oe_file.header))
+                logger.debug("Open data file: {}".format(op.basename(oe_file.path)) +
+                             LOG_STR_ITEM.format(header=oe_file.header))
             for oe_file in ref_files:
-                logger.info("Open reference file: {}".format(op.basename(oe_file.path)) +
-                            LOG_STR_ITEM.format(header=oe_file.header))
+                logger.debug("Open reference file: {}".format(op.basename(oe_file.path)) +
+                             LOG_STR_ITEM.format(header=oe_file.header))
 
             num_records, sampling_rate, buffer_size, block_size = oe.check_headers(data_files + ref_files)
 
@@ -289,7 +289,6 @@ def main(args):
                 # Same channel groups, but with flat numbering
                 cg_out = util.monotonic_prb(layout)
             prb_out.write('channel_groups = {}'.format(pprint.pformat(cg_out)))
-
 
         with open(op.join(out_path, output_basename + '.prm'), 'w') as prm_out:
             if prm_file_input:
