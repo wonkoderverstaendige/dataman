@@ -13,9 +13,10 @@
     [X] Allow single channel
     [X] Rescale vertical size when few channels shown (have margin pressure)
     [ ] Shared state Values with Streamer, update on full data load
+    [ ] First chunk sometimes displayed before loaded -> update procedure not synchronized enough
     
 # General
-    [ ] Integrate OIO
+    [X] Integrate OIO
     [X] Subcommand overhaul (oio+dm commands)
     [ ] dm ls should return number of datasets on subfolders
     [ ] Logging verbosity with --log=INFO etc.
