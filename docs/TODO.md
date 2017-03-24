@@ -30,3 +30,11 @@
 # Urgent
     [X] Holy frick, we forgot about the streaming branch!
     
+# Ref
+    [X] Make ref file
+    [X] Subtract ref file
+
+# Split
+    [X] Split based on groupings
+    [X] Split based on layout file (channel groups only)
+    
