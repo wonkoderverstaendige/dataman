@@ -37,7 +37,7 @@ class Column:
         return self.fmt.format(data)
 
 
-table_hdr = "{:^28}{sep}{:^6}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:^10}{sep}".format(
+table_hdr = "{:^28}{sep}{:^6}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:>3}{sep}{:^11}{sep}".format(
     "Folder name", "size", "#fil", "#vid", "#img", "#snd", '#doc', "format", sep=" ")
 
 _row = "{0:<28}{1}{2:>4}{3:>4}{4:>4}{5:>4}{6:>10}"
