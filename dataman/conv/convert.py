@@ -183,11 +183,12 @@ def main(args):
         raise NotImplementedError("Can't remove trailing zeros just yet.")
 
     # Input file format
-    formats = list(set([util.detect_format(target) for target in cli_args.target]))
+    targets = [op.abspath(op.expanduser(t)) for t in cli_args.target]
+    formats = list(set([util.detect_format(target) for target in targets]))
     assert len(formats) == 1
     format_input = formats[0]
     logger.debug('Input module: {}'.format(format_input.__name__))
-    cfg = format_input.config(cli_args.target[0])
+    cfg = format_input.config(targets[0])
 
     # Output file format
     format_output = FORMATS[cli_args.format.lower()]
@@ -208,7 +209,7 @@ def main(args):
                               'dead_channels': dead_channels}}
 
     elif cli_args.layout is not None:
-        layout = util.run_prb(cli_args.layout)
+        layout = util.run_prb(op.abspath(op.expanduser(cli_args.layout)))
         if cli_args.split_groups:
             channel_groups = layout['channel_groups']
             if 'dead_channels' in layout:
@@ -309,3 +310,6 @@ def main(args):
                                         n_channels=len(channel_group['channels'])))
 
     logging.debug('Done! Total data length written: {}'.format(util.fmt_time(time_written)))
+
+if __name__ == '__main__':
+    main('~/data/2014-10-30_15-04-50 -l ~/data/m0001_16.prb -o ~/data/testing -D 120'.split(' '))
