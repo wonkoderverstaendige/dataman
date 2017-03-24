@@ -9,6 +9,7 @@ import pprint
 import pkg_resources as pkgr
 from contextlib import ExitStack
 import time
+import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ DEFAULT_SHORT_TEMPLATE = '{prefix}--cg({cg_id:02})'
 
 
 def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
-                      file_mode='w', chunk_records=10000, duration=0,
+                      file_mode='w', chunk_records=100, duration=0,
                       dead_channels=None, zero_dead_channels=True):
     start_t = time.time()
     logger.debug('Starting continuous_to_dat conversion')
@@ -40,25 +41,24 @@ def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
     formatter = logging.Formatter('%(message)s')
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
-    logger.setLevel(logging.DEBUG)
 
-    logger.info('Input path : {}'.format(input_path))
-    logger.info('Output path: {}'.format(output_path))
+    logger.debug('Input path : {}'.format(input_path))
+    logger.debug('Output path: {}'.format(output_path))
 
     # NOTE: Channel numbers zero-based in configuration, but not in file name space. Grml.
     data_channels = [cid + 1 for cid in channel_group['channels']]
     ref_channels = [rid + 1 for rid in channel_group['reference']] if "reference" in channel_group else []
     dead_channels = [did + 1 for did in dead_channels]
-    logger.info("Dead channels to zero: {}, {}".format(zero_dead_channels, dead_channels))
+    logger.debug("Dead channels to zero: {}, {}".format(zero_dead_channels, dead_channels))
 
     dead_channels_indices = [data_channels.index(dc) for dc in dead_channels if dc in data_channels]
 
     data_file_paths = oe.gather_files(input_path, data_channels, proc_node)
     ref_file_paths = oe.gather_files(input_path, ref_channels, proc_node)
 
-    logger.info(LOG_STR_CHAN.format(channels=data_channels,
-                                    reference=ref_channels, dead=dead_channels,
-                                    proc_node=proc_node, file_mode=MODE_STR[file_mode]))
+    logger.debug(LOG_STR_CHAN.format(channels=data_channels,
+                                     reference=ref_channels, dead=dead_channels,
+                                     proc_node=proc_node, file_mode=MODE_STR[file_mode]))
 
     try:
         with ExitStack() as stack, open(output_path, file_mode + 'b') as out_fid_dat:
@@ -85,8 +85,10 @@ def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
 
             # loop over all records, in chunk sizes
             bytes_written = 0
+            pbar = tqdm.tqdm(total=records_left)
             while records_left:
                 count = min(records_left, chunk_records)
+                pbar.update(count)
 
                 logger.debug(DEBUG_STR_CHUNK.format(count=count, left=records_left,
                                                     num_records=num_records))
@@ -108,17 +110,18 @@ def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
 
                 records_left -= count
                 bytes_written += (count * 2048 * len(data_channels))
+            pbar.close()
 
             data_duration = bytes_written / (2 * sampling_rate * len(data_channels))
             elapsed = time.time() - start_t
             speed = bytes_written / elapsed
-            logger.info('{appended} {channels} channels into "{op:s}"'.format(
+            logger.debug('{appended} {channels} channels into "{op:s}"'.format(
                 appended=MODE_STR_PAST[file_mode], channels=len(data_channels),
                 op=os.path.abspath(output_path)))
-            logger.info('{rec} blocks ({dur:s}, {bw:.2f} MB) in {et:.2f} s ({ts:.2f} MB/s)'.format(
-                rec=num_records - records_left, dur=util.fmt_time(data_duration),
-                bw=bytes_written / 1e6, et=elapsed, ts=speed / 1e6))
-
+            logger.info(
+                '{n_channels} channels, {rec} blocks ({dur:s}, {bw:.2f} MB) in {et:.2f} s ({ts:.2f} MB/s)'.format(
+                    n_channels=len(data_channels), rec=num_records - records_left, dur=util.fmt_time(data_duration),
+                    bw=bytes_written / 1e6, et=elapsed, ts=speed / 1e6))
             # returning duration of data written, epsilon=1 sample, allows external loop to make proper judgement if
             # going to next target makes sense via comparison. E.g. if time less than one sample short of
             # duration limit.
@@ -183,12 +186,12 @@ def main(args):
     formats = list(set([util.detect_format(target) for target in cli_args.target]))
     assert len(formats) == 1
     format_input = formats[0]
-    logger.info('Input module: {}'.format(format_input.__name__))
+    logger.debug('Input module: {}'.format(format_input.__name__))
     cfg = format_input.config(cli_args.target[0])
 
     # Output file format
     format_output = FORMATS[cli_args.format.lower()]
-    logger.info('Output module: {}'.format(format_output.__name__))
+    logger.debug('Output module: {}'.format(format_output.__name__))
 
     # Set up channel layout (channels, references, dead channels) from command line inputs or layout file
     # List of bad channels, will be added to channel group dict
@@ -279,15 +282,18 @@ def main(args):
                     duration=duration)
 
         # create the per-group .prb and .prm files
+        # FIXME: Dead channels are big mess
         with open(op.join(out_path, output_basename + '.prb'), 'w') as prb_out:
             if cli_args.split_groups or layout is None:
                 # One prb file per channel group
                 ch_out = channel_group['channels']
-                cg_out = {0: {'channels': list(range(len(ch_out))),
-                              'dead_channels': sorted([ch_out.index(dc) for dc in dead_channels if dc in ch_out])}}
+                cg_out = {0: {'channels': list(range(len(ch_out)))}}
+                dead_channels = sorted([ch_out.index(dc) for dc in dead_channels if dc in ch_out])
+
             else:
                 # Same channel groups, but with flat numbering
-                cg_out = util.monotonic_prb(layout)
+                cg_out, dead_channels = util.monotonic_prb(layout)
+            prb_out.write('dead_channels = {}\n'.format(pprint.pformat(dead_channels)))
             prb_out.write('channel_groups = {}'.format(pprint.pformat(cg_out)))
 
         with open(op.join(out_path, output_basename + '.prm'), 'w') as prm_out:
@@ -302,4 +308,4 @@ def main(args):
                                         raw_file=output_file_path,
                                         n_channels=len(channel_group['channels'])))
 
-    logging.info('Done! Total data duration: {}'.format(util.fmt_time(time_written)))
+    logging.debug('Done! Total data length written: {}'.format(util.fmt_time(time_written)))
