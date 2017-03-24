@@ -24,5 +24,5 @@ Create average of good channels and subtract from all channels, overwriting the 
 ### Split
 Split the averaged file into channel groups as per the (reordered) probe file and delete the combined dat file.
 
-`"2014-10-30_15-04-50--cg(00).dat" -l "2014-10-30_15-04-50--cg(00).prb" --clean`
+`dm split "2014-10-30_15-04-50--cg(00).dat" -l "2014-10-30_15-04-50--cg(00).prb" --clean`
 
