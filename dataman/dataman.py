@@ -41,7 +41,8 @@ class DataMan(cmd.Cmd):
 
     def precmd(self, line):
         self.log.debug('Starting dataman v{} @git [{}]'.format(__version__, GIT_VERSION))
-        self.log.debug('Using oio v{} @git [{}]'.format(__version__, GIT_VERSION))
+        self.log.debug('Using oio v{} @git [{}]'.format(oio.__version__, oio.GIT_VERSION))
+        return line
 
     def do_ls(self, args_string):
         parser = argparse.ArgumentParser('Recording statistics',)
@@ -75,12 +76,10 @@ class DataMan(cmd.Cmd):
 
     def do_vis(self, args_string):
         from dataman.vis import vis
-        self.log.info('Starting visualization with dataman v{} @git [{}]'.format(__version__, GIT_VERSION))
         vis.run(args_string.split(' '))
 
     def do_conv(self, args_string):
         from dataman.conv import convert
-        self.log.info('Starting conversion with dataman v{} @git [{}]'.format(oio.__version__, oio.GIT_VERSION))
         convert.main(args_string.split(' '))
 
     def do_ref(self, args_string):

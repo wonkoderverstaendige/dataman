@@ -285,7 +285,7 @@ def main(args):
         # create the per-group .prb and .prm files
         # FIXME: Dead channels are big mess
         with open(op.join(out_path, output_basename + '.prb'), 'w') as prb_out:
-            if cli_args.split_groups or layout is None:
+            if cli_args.split_groups or (layout is None):
                 # One prb file per channel group
                 ch_out = channel_group['channels']
                 cg_out = {0: {'channels': list(range(len(ch_out)))}}

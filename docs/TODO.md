@@ -34,6 +34,7 @@
 # Ref
     [X] Make ref file
     [X] Subtract ref file
+    [ ] Ref using prb file of same name in same dir -L
 
 # Split
     [X] Split based on groupings
