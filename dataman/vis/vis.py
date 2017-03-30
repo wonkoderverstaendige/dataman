@@ -88,7 +88,6 @@ class Vis(app.Canvas):
         gloo.set_viewport(0, 0, *self.physical_size)
 
         self._timer = app.Timer('auto', connect=self.on_timer, start=True)
-
         gloo.set_state(clear_color='black', blend=True,
                        blend_func=('src_alpha', 'one_minus_src_alpha'))
         self.show()
