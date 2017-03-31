@@ -18,7 +18,6 @@ def ref(dat_path, ref_path=None, *args, **kwargs):
     assert ref_path
 
     logger.info('Reference subtraction')
-    logger.debug('Subtracting {} from {}'.format(ref_path, dat_path))
     subtract_reference(dat_path, ref_path, *args, **kwargs)
 
 
@@ -28,7 +27,7 @@ def subtract_reference(dat_path, ref_path, precision='single', inplace=False,
     # FIXME: Also memmap the reference file? Should be small even for long recordings...
     # FIXME: If not inplace, the file should be opened read only!
     # TODO: Allow immediate zero-ing of bad channels
-
+    logger.debug('Subtracting {} from {}'.format(ref_path, dat_path))
     logger.debug('Precision: {}, inplace={} with {} channels'.format(precision, inplace, n_channels))
     logger.debug('Opening files, dat: {}; ref: {}'.format(dat_path, ref_path))
     with open(dat_path, 'r+b') as dat, open(ref_path, 'rb') as mu:
@@ -54,8 +53,9 @@ def subtract_reference(dat_path, ref_path, precision='single', inplace=False,
             else:
                 out_arr[bn * bs:(bn + 1) * bs, :] = dat_arr[bn * bs:(bn + 1) * bs, :] - mu_arr[bn * bs:(bn + 1) * bs]
 
-            if zero_bad_channels:
+            if zero_bad_channels and ch_idx_bad is not None:
                 out_arr[bn * bs:(bn + 1) * bs, ch_idx_bad] = 0
+
     except BaseException as e:
         print(e)
 
@@ -122,21 +122,31 @@ def main(args):
     logger.debug(cfg)
 
     # FIXME: Assumes "pre-ordered" channels, i.e. 0:n_channels
-    if 'layout' in cli_args and cli_args.layout is not None:
-        layout = run_prb(cli_args.layout)
+    probe_file = cli_args.layout if 'layout' in cli_args else None
+
+    if probe_file is None:
+        base_name, _ = op.splitext(op.abspath(op.expanduser(cli_args.input)))
+        if op.exists(base_name + '.prb'):
+            probe_file = base_name + '.prb'
+            logger.warning('No probe file given, but .prb file found. Using {}'.format(probe_file))
+
+    if probe_file is not None:
+        layout = run_prb(probe_file)
+
         channels, bad_channels = flat_channel_list(layout)[:n_channels]
+        print(bad_channels)
     else:
         channels = None
         bad_channels = None
 
-    logger.debug('Good: {}, bad:'.format(channels, bad_channels))
+    logger.debug('Good: {}, bad: {}'.format(channels, bad_channels))
 
     ref(cli_args.input,
         ref_path=cli_args.reference,
         out_dir=cli_args.out,
         n_channels=n_channels,
         ch_idx_good=cli_args.good_channels,
-        ch_idx_bad=cli_args.bad_channels,
+        ch_idx_bad=bad_channels,
         zero_bad_channels=cli_args.zero_bad_channels,
         make_only=cli_args.make_only,
         inplace=cli_args.inplace)

@@ -29,17 +29,18 @@ def main(args):
     logger.debug('cli_args: {}'.format(cli_args))
 
     in_path = os.path.abspath(os.path.expanduser(cli_args.input))
-    in_file = os.path.basename(in_path)
     bp, ext = os.path.splitext(in_path)
 
+    probe_file = cli_args.layout
     if not any([cli_args.layout, cli_args.groups_of]):
-        # TODO: Check for existing prb file with same name
-        print(os.path.exists(bp + '.prb'))
-        logger.error('No information on how to split the channels. Either by groups_of, or with a prb file')
-        sys.exit(1)
+        if os.path.exists(bp + '.prb'):
+            probe_file = bp + '.prb'
+        else:
+            logger.error('No information on how to split the channels. Either by groups_of, or with a prb file')
+            sys.exit(1)
 
-    if cli_args.layout is not None:
-        layout = run_prb(cli_args.layout)
+    if probe_file is not None:
+        layout = run_prb(probe_file)
         channel_groups = layout['channel_groups']
         n_channels = sum([len(cg['channels']) for idx, cg in channel_groups.items()])
         logger.debug('{} channels from prb file'.format(n_channels))
@@ -77,6 +78,9 @@ def main(args):
             samples_remaining -= batch_size
 
     del mm
-    if cli_args.clean:
-        logger.warning('Deleting file {}'.format(in_path))
-        os.remove(in_path)
+    try:
+        if cli_args.clean:
+            logger.warning('Deleting file {}'.format(in_path))
+            os.remove(in_path)
+    except PermissionError:
+        logger.error("Couldn't clean up files. Sadface.")
