@@ -85,10 +85,10 @@ def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
 
             # loop over all records, in chunk sizes
             bytes_written = 0
-            pbar = tqdm.tqdm(total=records_left)
+            pbar = tqdm.tqdm(total=records_left*1024, unit_scale=True, unit='Samples')
             while records_left:
                 count = min(records_left, chunk_records)
-                pbar.update(count)
+                pbar.update(count*1024)
 
                 logger.debug(DEBUG_STR_CHUNK.format(count=count, left=records_left,
                                                     num_records=num_records))
