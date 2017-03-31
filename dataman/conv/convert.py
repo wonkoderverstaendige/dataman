@@ -29,7 +29,7 @@ MODE_STR = {'a': 'Append', 'w': "Write"}
 MODE_STR_PAST = {'a': 'Appended', 'w': "Wrote"}
 
 DEFAULT_FULL_TEMPLATE = '{prefix}--cg({cg_id:02})_ch[{crs}]'
-DEFAULT_SHORT_TEMPLATE = '{prefix}--cg({cg_id:02})'
+DEFAULT_SHORT_TEMPLATE = '{prefix}--cg{cg_id:02}'
 
 
 def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,

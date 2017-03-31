@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from oio.util import run_prb
+from oio.util import run_prb, make_prm
 from oio.formats import dat
 import logging
 from tqdm import tqdm
@@ -77,7 +77,15 @@ def main(args):
                 arr.take(channel_groups[indices[cg_id]]['channels'], axis=1).tofile(out_files[cg_id])
             samples_remaining -= batch_size
 
+        logger.debug('Writing .prm files')
+        for outfile in out_files:
+            print(outfile.name)
+            make_prm(outfile.name, 'tetrode.prb')
+
     del mm
+
+
+
     try:
         if cli_args.clean:
             logger.warning('Deleting file {}'.format(in_path))
