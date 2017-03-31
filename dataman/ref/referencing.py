@@ -1,7 +1,7 @@
-from os import path as op
+from os import path as op, remove
 from shutil import copyfile
 import numpy as np
-from oio.util import get_batch_size, run_prb, flat_channel_list
+from oio.util import get_batch_size, run_prb, flat_channel_list, has_prb
 from oio.formats import dat
 import logging
 from tqdm import trange
@@ -9,16 +9,25 @@ from tqdm import trange
 logger = logging.getLogger(__name__)
 
 
-def ref(dat_path, ref_path=None, *args, **kwargs):
+def ref(dat_path, ref_path=None, keep=False, inplace=False, *args, **kwargs):
     dat_path = op.abspath(op.expanduser(dat_path))
     if ref_path is None:
         logger.info('Creating reference...')
         ref_path = make_ref_file(dat_path, *args, **kwargs)
         logger.debug('Reference file at {}'.format(ref_path))
+
     assert ref_path
 
     logger.info('Reference subtraction')
-    subtract_reference(dat_path, ref_path, *args, **kwargs)
+    subtract_reference(dat_path, ref_path, inplace=inplace, *args, **kwargs)
+
+    # Copy the prb file
+    if not inplace:
+        logger.warning('Copying probe file to follow referenced data.')
+
+    if not keep:
+        logger.warning('Not keeping reference file. Deleting it...')
+        remove(ref_path)
 
 
 def subtract_reference(dat_path, ref_path, precision='single', inplace=False,
@@ -101,6 +110,7 @@ def copy_as(src, dst):
 
 
 def main(args):
+    # TODO: Mutually exclusive bad/good channels
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('input', help='Dat file')
@@ -113,6 +123,7 @@ def main(args):
     parser.add_argument('-i', '--inplace', action='store_true', help='Subtract reference in place.')
     parser.add_argument('-m', '--make-only', action='store_true', help='Only create the reference file.')
     parser.add_argument('-l', '--layout', help='Path to probe file defining channel order')
+    parser.add_argument('-k', '--keep', action='store_true', help='Keep intermediate reference file')
     cli_args = parser.parse_args(args)
 
     n_channels = cli_args.channels if 'channels' in cli_args else None
@@ -124,11 +135,9 @@ def main(args):
     # FIXME: Assumes "pre-ordered" channels, i.e. 0:n_channels
     probe_file = cli_args.layout if 'layout' in cli_args else None
 
-    if probe_file is None:
-        base_name, _ = op.splitext(op.abspath(op.expanduser(cli_args.input)))
-        if op.exists(base_name + '.prb'):
-            probe_file = base_name + '.prb'
-            logger.warning('No probe file given, but .prb file found. Using {}'.format(probe_file))
+    if probe_file is None and has_prb(cli_args.input):
+        probe_file = has_prb(cli_args.input)
+        logger.warning('No probe file given, but .prb file found. Using {}'.format(probe_file))
 
     if probe_file is not None:
         layout = run_prb(probe_file)
@@ -149,4 +158,5 @@ def main(args):
         ch_idx_bad=bad_channels,
         zero_bad_channels=cli_args.zero_bad_channels,
         make_only=cli_args.make_only,
-        inplace=cli_args.inplace)
+        inplace=cli_args.inplace,
+        keep=cli_args.keep)
