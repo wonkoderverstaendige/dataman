@@ -10,6 +10,7 @@ import pkg_resources as pkgr
 from contextlib import ExitStack
 import time
 import tqdm
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +211,7 @@ def main(args):
 
     elif cli_args.layout is not None:
         layout = util.run_prb(op.abspath(op.expanduser(cli_args.layout)))
+        logger.debug('Opened layout file {}'.format(layout))
         if cli_args.split_groups:
             channel_groups = layout['channel_groups']
             if 'dead_channels' in layout:
@@ -231,6 +233,7 @@ def main(args):
         logger.warning('No channels given, will try to get channel number from target.')
         channel_groups = {0: {'channels': list(range(cfg['CHANNELS']['n_channels'])),
                               'dead_channels': dead_channels}}
+
 
     # Template parameter file
     prm_file_input = cli_args.params
