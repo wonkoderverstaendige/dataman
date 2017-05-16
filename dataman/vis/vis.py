@@ -265,7 +265,7 @@ class Vis(app.Canvas):
 
         # TODO: use y-coordinate to guesstimate the channel id + amplitude at point
         t_r = x_r * self.n_cols - math.floor(x_r * self.n_cols)
-        t_sample = (t_r * self.buffer_length + self.offset * self.cfg['HEADER']['block_size'])
+        t_sample = (t_r * self.buffer_length + self.offset * 1024)  # self.cfg['HEADER']['block_size']
         t_sec = t_sample / self.fs
         self.logger.info('Sample {} @ {}'.format(int(t_sample), tools.fmt_time(t_sec)))
 
