@@ -33,7 +33,7 @@ BUFFER_LENGTH = int(3e4)
 
 class Vis(app.Canvas):
     def __init__(self, target_path, n_cols=1, channels=None, *args, **kwargs):
-        app.Canvas.__init__(self, title='Use your wheel to zoom!', keys='interactive', size=(1920, 1080),
+        app.Canvas.__init__(self, title='Use your wheel to zoom!', keys='interactive', size=(1900, 1000),
                             position=(0, 0), app='pyqt5')
         self.logger = logging.getLogger(__name__)
 
