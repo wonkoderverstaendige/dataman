@@ -53,7 +53,7 @@ def subtract_reference(dat_path, ref_path, precision='single', inplace=False,
         if inplace:
             out_arr = dat_arr
         else:
-            out_arr = np.memmap(fname + '_mean_referenced' + ext, mode='w+', dtype=dat_arr.dtype, shape=dat_arr.shape)
+            out_arr = np.memmap(fname + '_meanref' + ext, mode='w+', dtype=dat_arr.dtype, shape=dat_arr.shape)
 
         for bn in trange(n_batches + 1):
             bs = batch_size if bn < n_batches else batch_size_last
