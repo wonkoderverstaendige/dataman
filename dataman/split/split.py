@@ -77,10 +77,10 @@ def main(args):
                 arr.take(channel_groups[indices[cg_id]]['channels'], axis=1).tofile(out_files[cg_id])
             samples_remaining -= batch_size
 
-        logger.debug('Writing .prm files')
-        for outfile in out_files:
-            print(outfile.name)
-            make_prm(outfile.name, 'tetrode.prb')
+#        logger.debug('Writing .prm files')
+#        for outfile in out_files:
+#            print(outfile.name)
+#            make_prm(outfile.name, 'tetrode.prb')
 
     del mm
 
