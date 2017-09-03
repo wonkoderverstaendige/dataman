@@ -226,6 +226,7 @@ def main(args):
 
     elif cli_args.layout is not None:
         layout = util.run_prb(op.abspath(op.expanduser(cli_args.layout)))
+        logger.debug('Opened layout file {}'.format(layout))
         if cli_args.split_groups:
             channel_groups = layout['channel_groups']
             if 'dead_channels' in layout:
