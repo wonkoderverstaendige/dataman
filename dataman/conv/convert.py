@@ -36,6 +36,8 @@ def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
                       file_mode='w', chunk_records=100, duration=0,
                       dead_channels=None, zero_dead_channels=True):
     start_t = time.time()
+
+    # Logging
     logger.debug('Starting continuous_to_dat conversion')
     file_handler = logging.FileHandler(output_path + '.log')
     formatter = logging.Formatter('%(message)s')
@@ -45,16 +47,27 @@ def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
     logger.debug('Input path : {}'.format(input_path))
     logger.debug('Output path: {}'.format(output_path))
 
+    # Channel setup
     # NOTE: Channel numbers zero-based in configuration, but not in file name space. Grml.
     data_channels = [cid + 1 for cid in channel_group['channels']]
     ref_channels = [rid + 1 for rid in channel_group['reference']] if "reference" in channel_group else []
     dead_channels = [did + 1 for did in dead_channels]
     logger.debug("Dead channels to zero: {}, {}".format(zero_dead_channels, dead_channels))
-
     dead_channels_indices = [data_channels.index(dc) for dc in dead_channels if dc in data_channels]
 
-    data_file_paths = oe.gather_files(input_path, data_channels, proc_node)
-    ref_file_paths = oe.gather_files(input_path, ref_channels, proc_node)
+    # Input files
+    data_sub_files = []
+    ref_sub_files = []
+    while True:
+        sub_id = len(data_sub_files)
+        try:
+            data_sub_files.append(oe.gather_files(input_path, data_channels, proc_node, sub_id=sub_id))
+            ref_sub_files.append(oe.gather_files(input_path, ref_channels, proc_node, sub_id=sub_id))
+        except IOError:
+            break
+
+    if not data_sub_files:
+        raise(IOError('Missing input files'))
 
     logger.debug(LOG_STR_CHAN.format(channels=data_channels,
                                      reference=ref_channels, dead=dead_channels,
@@ -62,71 +75,74 @@ def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
 
     try:
         with ExitStack() as stack, open(output_path, file_mode + 'b') as out_fid_dat:
+            data_duration = 0
 
-            data_files = [stack.enter_context(oe.ContinuousFile(f)) for f in data_file_paths]
-            ref_files = [stack.enter_context(oe.ContinuousFile(f)) for f in ref_file_paths]
-            for oe_file in data_files:
-                logger.debug("Open data file: {}".format(op.basename(oe_file.path)) +
-                             LOG_STR_ITEM.format(header=oe_file.header))
-            for oe_file in ref_files:
-                logger.debug("Open reference file: {}".format(op.basename(oe_file.path)) +
-                             LOG_STR_ITEM.format(header=oe_file.header))
+            # Loop over all sub-recordings
+            for sub_id in range(len(data_sub_files)):
+                data_files = [stack.enter_context(oe.ContinuousFile(f)) for f in data_sub_files[sub_id]]
+                ref_files = [stack.enter_context(oe.ContinuousFile(f)) for f in ref_sub_files[sub_id]]
+                for oe_file in data_files:
+                    logger.debug("Open data file: {}".format(op.basename(oe_file.path)) +
+                                 LOG_STR_ITEM.format(header=oe_file.header))
+                for oe_file in ref_files:
+                    logger.debug("Open reference file: {}".format(op.basename(oe_file.path)) +
+                                 LOG_STR_ITEM.format(header=oe_file.header))
 
-            num_records, sampling_rate, buffer_size, block_size = oe.check_headers(data_files + ref_files)
+                num_records, sampling_rate, buffer_size, block_size = oe.check_headers(data_files + ref_files)
 
-            # If duration limited, find max number of records that should be grabbed
-            records_left = num_records if not duration \
-                else min(num_records, int(duration * sampling_rate // block_size))
-            if records_left < 1:
-                epsilon = 1 / sampling_rate * block_size * 1000
-                logger.warning("Remaining duration limit ({:.0f} ms) less than duration of single block ({:.0f} ms)."
-                               " Skipping target.".format(duration * 1000, epsilon))
-                return 0
+                # If duration limited, find max number of records that should be grabbed
+                records_left = num_records if not duration \
+                    else min(num_records, int(duration * sampling_rate // block_size))
+                if records_left < 1:
+                    epsilon = 1 / sampling_rate * block_size * 1000
+                    logger.warning("Remaining duration limit ({:.0f} ms) less than duration of single block ({:.0f} ms). "
+                                   "Skipping target.".format(duration * 1000, epsilon))
+                    return 0
 
-            # loop over all records, in chunk sizes
-            bytes_written = 0
-            pbar = tqdm.tqdm(total=records_left*1024, unit_scale=True, unit='Samples')
-            while records_left:
-                count = min(records_left, chunk_records)
-                pbar.update(count*1024)
+                # loop over all records, in chunk sizes
+                bytes_written = 0
+                pbar = tqdm.tqdm(total=records_left*1024, unit_scale=True, unit='Samples')
+                while records_left:
+                    count = min(records_left, chunk_records)
+                    pbar.update(count*1024)
 
-                logger.debug(DEBUG_STR_CHUNK.format(count=count, left=records_left,
-                                                    num_records=num_records))
-                res = np.vstack([f.read_record(count) for f in data_files])
+                    logger.debug(DEBUG_STR_CHUNK.format(count=count, left=records_left,
+                                                        num_records=num_records))
+                    res = np.vstack([f.read_record(count) for f in data_files])
 
-                # reference channels if needed
-                if len(ref_channels):
-                    logger.debug(DEBUG_STR_REREF.format(channels=ref_channels))
-                    res -= np.vstack([f.read_record(count) for f in ref_files]).mean(axis=0, dtype=np.int16)
+                    # reference channels if needed
+                    if len(ref_channels):
+                        logger.debug(DEBUG_STR_REREF.format(channels=ref_channels))
+                        res -= np.vstack([f.read_record(count) for f in ref_files]).mean(axis=0, dtype=np.int16)
 
-                # zero dead channels if needed
-                if len(dead_channels_indices) and zero_dead_channels:
-                    zeros = np.zeros_like(res[0])
-                    for dci in dead_channels_indices:
-                        logger.debug(DEBUG_STR_ZEROS.format(flag=zero_dead_channels, channel=data_channels[dci]))
-                        res[dci] = zeros
+                    # zero dead channels if needed
+                    if len(dead_channels_indices) and zero_dead_channels:
+                        zeros = np.zeros_like(res[0])
+                        for dci in dead_channels_indices:
+                            logger.debug(DEBUG_STR_ZEROS.format(flag=zero_dead_channels, channel=data_channels[dci]))
+                            res[dci] = zeros
 
-                res.transpose().tofile(out_fid_dat)
+                    res.transpose().tofile(out_fid_dat)
 
-                records_left -= count
-                bytes_written += (count * 2048 * len(data_channels))
-            pbar.close()
+                    records_left -= count
+                    bytes_written += (count * 2048 * len(data_channels))
+                pbar.close()
 
-            data_duration = bytes_written / (2 * sampling_rate * len(data_channels))
-            elapsed = time.time() - start_t
-            speed = bytes_written / elapsed
-            logger.debug('{appended} {channels} channels into "{op:s}"'.format(
-                appended=MODE_STR_PAST[file_mode], channels=len(data_channels),
-                op=os.path.abspath(output_path)))
-            logger.info(
-                '{n_channels} channels, {rec} blocks ({dur:s}, {bw:.2f} MB) in {et:.2f} s ({ts:.2f} MB/s)'.format(
-                    n_channels=len(data_channels), rec=num_records - records_left, dur=util.fmt_time(data_duration),
-                    bw=bytes_written / 1e6, et=elapsed, ts=speed / 1e6))
-            # returning duration of data written, epsilon=1 sample, allows external loop to make proper judgement if
-            # going to next target makes sense via comparison. E.g. if time less than one sample short of
-            # duration limit.
-            logger.removeHandler(file_handler)
-            file_handler.close()
+                data_duration += bytes_written / (2 * sampling_rate * len(data_channels))
+                elapsed = time.time() - start_t
+                speed = bytes_written / elapsed
+                logger.debug('{appended} {channels} channels into "{op:s}"'.format(
+                    appended=MODE_STR_PAST[file_mode], channels=len(data_channels),
+                    op=os.path.abspath(output_path)))
+                logger.info(
+                    '{n_channels} channels, {rec} blocks ({dur:s}, {bw:.2f} MB) in {et:.2f} s ({ts:.2f} MB/s)'.format(
+                        n_channels=len(data_channels), rec=num_records - records_left, dur=util.fmt_time(data_duration),
+                        bw=bytes_written / 1e6, et=elapsed, ts=speed / 1e6))
+                # returning duration of data written, epsilon=1 sample, allows external loop to make proper judgement if
+                # going to next target makes sense via comparison. E.g. if time less than one sample short of
+                # duration limit.
+                logger.removeHandler(file_handler)
+                file_handler.close()
 
             return data_duration
 
@@ -232,9 +248,6 @@ def main(args):
         channel_groups = {0: {'channels': list(range(cfg['CHANNELS']['n_channels'])),
                               'dead_channels': dead_channels}}
 
-    # Template parameter file
-    prm_file_input = cli_args.params
-
     # Output file path
     if cli_args.out_path is None:
         out_path = os.getcwd()
@@ -282,7 +295,7 @@ def main(args):
                     file_mode='a' if file_mode else 'w',
                     duration=duration)
 
-        # create the per-group .prb and .prm files
+        # create the per-group .prb files
         # FIXME: Dead channels are big mess
         with open(op.join(out_path, output_basename + '.prb'), 'w') as prb_out:
             if cli_args.split_groups or (layout is None):
@@ -297,17 +310,20 @@ def main(args):
             prb_out.write('dead_channels = {}\n'.format(pprint.pformat(dead_channels)))
             prb_out.write('channel_groups = {}'.format(pprint.pformat(cg_out)))
 
-        with open(op.join(out_path, output_basename + '.prm'), 'w') as prm_out:
-            if prm_file_input:
-                f = open(prm_file_input, 'r')
-                prm_in = f.read()
-                f.close()
-            else:
-                prm_in = pkgr.resource_string('config', 'default.prm').decode()
-            prm_out.write(prm_in.format(experiment_name=output_basename,
-                                        probe_file=output_basename + '.prb',
-                                        raw_file=output_file_path,
-                                        n_channels=len(channel_group['channels'])))
+        # FIXME: Generation of .prm files
+        # # Template parameter file
+        # prm_file_input = cli_args.params
+        # with open(op.join(out_path, output_basename + '.prm'), 'w') as prm_out:
+        #     if prm_file_input:
+        #         f = open(prm_file_input, 'r')
+        #         prm_in = f.read()
+        #         f.close()
+        #     else:
+        #         prm_in = pkgr.resource_string('config', 'default.prm').decode()
+        #     prm_out.write(prm_in.format(experiment_name=output_basename,
+        #                                 probe_file=output_basename + '.prb',
+        #                                 raw_file=output_file_path,
+        #                                 n_channels=len(channel_group['channels'])))
 
     logging.debug('Done! Total data length written: {}'.format(util.fmt_time(time_written)))
 
