@@ -60,9 +60,11 @@ def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
     ref_sub_files = []
     while True:
         sub_id = len(data_sub_files)
+        print('Sub id:', sub_id)
         try:
             data_sub_files.append(oe.gather_files(input_path, data_channels, proc_node, sub_id=sub_id))
             ref_sub_files.append(oe.gather_files(input_path, ref_channels, proc_node, sub_id=sub_id))
+            break
         except IOError:
             break
 
