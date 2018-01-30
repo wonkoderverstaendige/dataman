@@ -121,6 +121,7 @@ def main():
         vis     Simple data visualizer
         conv    Convert formats and layouts
         ref     Creating references/reference-subtracting data
+        split   Split file into separate files bundling channels
         ''')
     parser.add_argument('command', help='Command to execute', nargs='?', default=None)
     parser.add_argument('-v', '--verbose', action='store_true',
