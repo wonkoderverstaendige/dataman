@@ -38,11 +38,15 @@ class DataMan(cmd.Cmd):
 
     def preloop(self):
         self.log.debug("Starting DataMan CLI")
+        self.intro_dbg()
 
     def precmd(self, line):
+        self.intro_dbg()
+        return line
+
+    def intro_dbg(self):
         self.log.debug('Starting dataman v{} @git [{}]'.format(__version__, GIT_VERSION))
         self.log.debug('Using oio v{} @git [{}]'.format(oio.__version__, oio.GIT_VERSION))
-        return line
 
     def do_ls(self, args_string):
         parser = argparse.ArgumentParser('Recording statistics',)
@@ -163,8 +167,10 @@ def main():
 
     # some other command was given
     else:
-        logger.debug('Command {}, args: {:}'.format(cli_args.command, ' '.join(cmd_args)))
-        DataMan().onecmd('{} {}'.format(cli_args.command, ' '.join(cmd_args)))
+        # logger.debug('Command {}, args: {:}'.format(cli_args.command, ' '.join(cmd_args)))
+        dm = DataMan()
+        dm.precmd('')
+        dm.onecmd('{} {}'.format(cli_args.command, ' '.join(cmd_args)))
 
 
 if __name__ == "__main__":
