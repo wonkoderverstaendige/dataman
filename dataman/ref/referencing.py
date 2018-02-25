@@ -127,7 +127,7 @@ def main(args):
     cli_args = parser.parse_args(args)
 
     n_channels = cli_args.channels if 'channels' in cli_args else None
-    cfg = dat.config(cli_args.input, n_channels=n_channels)
+    cfg = dat.metadata(cli_args.input, n_channels=n_channels)
     if n_channels is None:
         n_channels = cfg['CHANNELS']['n_channels']
     logger.debug(cfg)

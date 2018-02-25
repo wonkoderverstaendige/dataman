@@ -6,10 +6,12 @@ from oio import util
 from oio.formats import valid_formats
 from oio.formats import open_ephys as oe
 import pprint
-import pkg_resources as pkgr
 from contextlib import ExitStack
 import time
 import tqdm
+import argparse
+from dataman.lib.constants import LOG_LEVEL_VERBOSE
+from pprint import pformat
 
 logger = logging.getLogger(__name__)
 
@@ -32,113 +34,100 @@ DEFAULT_FULL_TEMPLATE = '{prefix}--cg({cg_id:02})_ch[{crs}]'
 DEFAULT_SHORT_TEMPLATE = '{prefix}--cg{cg_id:02}'
 
 
-def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
-                      file_mode='w', chunk_records=100, duration=0,
-                      dead_channels=None, zero_dead_channels=True):
+def continuous_to_dat(target_metadata, output_path, channel_group,
+                      file_mode='w', chunk_records=1000, duration=0,
+                      dead_channel_ids=None, zero_dead_channels=True):
     start_t = time.time()
 
     # Logging
-    logger.debug('Starting continuous_to_dat conversion')
     file_handler = logging.FileHandler(output_path + '.log')
     formatter = logging.Formatter('%(message)s')
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
+    logger.log(level=LOG_LEVEL_VERBOSE, msg='Target metadata: {}'.format(pformat(target_metadata, indent=2)))
 
-    logger.debug('Input path : {}'.format(input_path))
-    logger.debug('Output path: {}'.format(output_path))
-
-    # Channel setup
     # NOTE: Channel numbers zero-based in configuration, but not in file name space. Grml.
-    data_channels = [cid + 1 for cid in channel_group['channels']]
-    ref_channels = [rid + 1 for rid in channel_group['reference']] if "reference" in channel_group else []
-    dead_channels = [did + 1 for did in dead_channels]
-    logger.debug("Dead channels to zero: {}, {}".format(zero_dead_channels, dead_channels))
-    dead_channels_indices = [data_channels.index(dc) for dc in dead_channels if dc in data_channels]
-
-    # Input files
-    data_sub_files = []
-    ref_sub_files = []
-    while True:
-        sub_id = len(data_sub_files)
-        print('Sub id:', sub_id)
-        try:
-            data_sub_files.append(oe.gather_files(input_path, data_channels, proc_node, sub_id=sub_id))
-            ref_sub_files.append(oe.gather_files(input_path, ref_channels, proc_node, sub_id=sub_id))
-            break
-        except IOError:
-            break
-
-    if not data_sub_files:
-        raise(IOError('Missing input files'))
-
-    logger.debug(LOG_STR_CHAN.format(channels=data_channels,
-                                     reference=ref_channels, dead=dead_channels,
-                                     proc_node=proc_node, file_mode=MODE_STR[file_mode]))
+    data_channel_ids = [cid + 1 for cid in channel_group['channels']]
+    ref_channel_ids = [rid + 1 for rid in channel_group['reference']] if "reference" in channel_group else []
+    dead_channel_ids = [did + 1 for did in dead_channel_ids]
+    logger.debug("Zeroing dead channels: {}, dead (OE) channels: {}".format(zero_dead_channels, dead_channel_ids))
+    dead_channels_indices = [data_channel_ids.index(dc) for dc in dead_channel_ids if dc in data_channel_ids]
 
     try:
+        logger.debug('Opening output file {} in filemode {}'.format(output_path, file_mode + 'b'))
         with ExitStack() as stack, open(output_path, file_mode + 'b') as out_fid_dat:
             data_duration = 0
 
             # Loop over all sub-recordings
-            for sub_id in range(len(data_sub_files)):
-                data_files = [stack.enter_context(oe.ContinuousFile(f)) for f in data_sub_files[sub_id]]
-                ref_files = [stack.enter_context(oe.ContinuousFile(f)) for f in ref_sub_files[sub_id]]
-                for oe_file in data_files:
-                    logger.debug("Open data file: {}".format(op.basename(oe_file.path)) +
-                                 LOG_STR_ITEM.format(header=oe_file.header))
-                for oe_file in ref_files:
-                    logger.debug("Open reference file: {}".format(op.basename(oe_file.path)) +
-                                 LOG_STR_ITEM.format(header=oe_file.header))
+            for sub_id, subset in target_metadata['SUBSETS'].items():
+                logger.debug('Converting sub_id {}'.format(sub_id))
+                data_file_paths = [subset['FILES'][cid - 1]['FILEPATH'] for cid in data_channel_ids]
+                ref_file_paths = [subset['FILES'][rid - 1]['FILEPATH'] for rid in ref_channel_ids]
+                logger.log(level=LOG_LEVEL_VERBOSE, msg=data_file_paths)
 
-                num_records, sampling_rate, buffer_size, block_size = oe.check_headers(data_files + ref_files)
+                data_files = [stack.enter_context(oe.ContinuousFile(f)) for f in data_file_paths]
+                ref_files = [stack.enter_context(oe.ContinuousFile(f)) for f in ref_file_paths]
+                for oe_file in data_files:
+                    logger.log(level=LOG_LEVEL_VERBOSE, msg="Open data file: {}".format(op.basename(oe_file.path)) +
+                                                            LOG_STR_ITEM.format(header=oe_file.header))
+                for oe_file in ref_files:
+                    logger.log(level=LOG_LEVEL_VERBOSE,
+                               msg="Open reference file: {}".format(op.basename(oe_file.path)) +
+                                   LOG_STR_ITEM.format(header=oe_file.header))
+
+                n_blocks = subset['JOINT_HEADERS']['n_blocks']
+                sampling_rate = subset['JOINT_HEADERS']['sampling_rate']
+                # buffer_size = subset['JOINT_HEADERS']['buffer_size']
+                block_size = subset['JOINT_HEADERS']['block_size']
 
                 # If duration limited, find max number of records that should be grabbed
-                records_left = num_records if not duration \
-                    else min(num_records, int(duration * sampling_rate // block_size))
+                records_left = n_blocks if not duration \
+                    else min(n_blocks, int(duration * sampling_rate // block_size))
                 if records_left < 1:
                     epsilon = 1 / sampling_rate * block_size * 1000
-                    logger.warning("Remaining duration limit ({:.0f} ms) less than duration of single block ({:.0f} ms). "
-                                   "Skipping target.".format(duration * 1000, epsilon))
+                    logger.warning(
+                        "Remaining duration limit ({:.0f} ms) less than duration of single block ({:.0f} ms). "
+                        "Skipping target.".format(duration * 1000, epsilon))
                     return 0
 
                 # loop over all records, in chunk sizes
                 bytes_written = 0
-                pbar = tqdm.tqdm(total=records_left*1024, unit_scale=True, unit='Samples')
+                pbar = tqdm.tqdm(total=records_left * 1024, unit_scale=True, unit='Samples')
                 while records_left:
                     count = min(records_left, chunk_records)
-                    pbar.update(count*1024)
+                    pbar.update(count * 1024)
 
-                    logger.debug(DEBUG_STR_CHUNK.format(count=count, left=records_left,
-                                                        num_records=num_records))
+                    logger.log(level=LOG_LEVEL_VERBOSE, msg=DEBUG_STR_CHUNK.format(count=count, left=records_left,
+                                                                                   num_records=n_blocks))
                     res = np.vstack([f.read_record(count) for f in data_files])
 
                     # reference channels if needed
-                    if len(ref_channels):
-                        logger.debug(DEBUG_STR_REREF.format(channels=ref_channels))
+                    if len(ref_channel_ids):
+                        logger.debug(DEBUG_STR_REREF.format(channels=ref_channel_ids))
                         res -= np.vstack([f.read_record(count) for f in ref_files]).mean(axis=0, dtype=np.int16)
 
                     # zero dead channels if needed
                     if len(dead_channels_indices) and zero_dead_channels:
                         zeros = np.zeros_like(res[0])
                         for dci in dead_channels_indices:
-                            logger.debug(DEBUG_STR_ZEROS.format(flag=zero_dead_channels, channel=data_channels[dci]))
+                            logger.debug(DEBUG_STR_ZEROS.format(flag=zero_dead_channels, channel=data_channel_ids[dci]))
                             res[dci] = zeros
 
                     res.transpose().tofile(out_fid_dat)
 
                     records_left -= count
-                    bytes_written += (count * 2048 * len(data_channels))
+                    bytes_written += (count * 2048 * len(data_channel_ids))
                 pbar.close()
 
-                data_duration += bytes_written / (2 * sampling_rate * len(data_channels))
+                data_duration += bytes_written / (2 * sampling_rate * len(data_channel_ids))
                 elapsed = time.time() - start_t
                 speed = bytes_written / elapsed
                 logger.debug('{appended} {channels} channels into "{op:s}"'.format(
-                    appended=MODE_STR_PAST[file_mode], channels=len(data_channels),
+                    appended=MODE_STR_PAST[file_mode], channels=len(data_channel_ids),
                     op=os.path.abspath(output_path)))
                 logger.info(
                     '{n_channels} channels, {rec} blocks ({dur:s}, {bw:.2f} MB) in {et:.2f} s ({ts:.2f} MB/s)'.format(
-                        n_channels=len(data_channels), rec=num_records - records_left, dur=util.fmt_time(data_duration),
+                        n_channels=len(data_channel_ids), rec=n_blocks - records_left, dur=util.fmt_time(data_duration),
                         bw=bytes_written / 1e6, et=elapsed, ts=speed / 1e6))
                 # returning duration of data written, epsilon=1 sample, allows external loop to make proper judgement if
                 # going to next target makes sense via comparison. E.g. if time less than one sample short of
@@ -149,11 +138,10 @@ def continuous_to_dat(input_path, output_path, channel_group, proc_node=100,
             return data_duration
 
     except IOError as e:
-        print('Operation failed: {error}'.format(error=e.strerror))
+        logger.exception('Operation failed: {error}'.format(error=e.strerror))
 
 
 def main(args):
-    import argparse
     parser = argparse.ArgumentParser('Convert file formats/layouts. Default result is int16 .dat file.')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help="Verbose (debug) output")
@@ -188,7 +176,6 @@ def main(args):
                         help='List of dead channels. If flag set, these will be set to zero.')
     parser.add_argument('-z', '--zero-dead-channels', action='store_true')
     parser.add_argument('--dry-run', action='store_true', help='Do not write data files (but still create prb/prm')
-    # parser.add_argument("-n", "--proc-node", help="Processor node id", type=int, default=100)
     parser.add_argument('-p', "--params", help='Path to .params file.')
     parser.add_argument('-D', "--duration", type=int, help='Limit duration of recording (s)')
     parser.add_argument('--remove-trailing-zeros', action='store_true')
@@ -200,13 +187,14 @@ def main(args):
     if cli_args.remove_trailing_zeros:
         raise NotImplementedError("Can't remove trailing zeros just yet.")
 
-    # Input file format
     targets = [op.abspath(op.expanduser(t)) for t in cli_args.target]
     formats = list(set([util.detect_format(target) for target in targets]))
-    assert len(formats) == 1
+
+    # Input file format
+    logger.debug('Inputs found: {}'.format(formats))
     format_input = formats[0]
-    logger.debug('Input module: {}'.format(format_input.__name__))
-    cfg = format_input.config(targets[0])
+    assert len(formats) == 1
+    logger.debug('Using module: {}'.format(format_input.__name__))
 
     # Output file format
     format_output = FORMATS[cli_args.format.lower()]
@@ -247,14 +235,26 @@ def main(args):
             channel_groups = {0: {'channels': channels,
                                   'dead_channels': dead_channels}}
     else:
-        logger.warning('No channels given, will try to get channel number from target.')
-        channel_groups = {0: {'channels': list(range(cfg['CHANNELS']['n_channels'])),
+        logger.debug('No channels given on CLI, will try to get channel number from target later.')
+        channel_groups = None
+
+    # Generate configuration from input files found by the format
+    # This step already checks for the existence of the data files
+    # and can fail prematurely if the wrong naming template is being used
+    # This needs more work.
+    logger.debug('Getting metadata for all targets')
+    targets_metadata_list = [format_input.metadata_from_target(t) for t in targets]
+
+    if channel_groups is None:
+        target_channels = list(set([ch for t in targets_metadata_list for ch in t['CHANNELS']]))
+
+        channel_groups = {0: {'channels': target_channels,
                               'dead_channels': dead_channels}}
 
     # Output file path
     if cli_args.out_path is None:
         out_path = os.getcwd()
-        logger.warning('Using current working directory "{}" as output path.'.format(out_path))
+        logger.info('Using current working directory "{}" as output path.'.format(out_path))
     else:
         out_path = op.abspath(op.expanduser(cli_args.out_path))
 
@@ -270,33 +270,39 @@ def main(args):
     fname_template = default_template if cli_args.template_fname is None else cli_args.template_fname
     logger.debug('Filename template: {}'.format(fname_template))
 
-    logger.debug('Zero dead channels: {} '.format(cli_args.zero_dead_channels))
-
-    time_written = 0
+    # +++++++++++++++++++++++++++++++++++++++++ MAIN LOOP ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    # Iterates over all channel groups, calling continuous_to_dat for each to be bundled together
+    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    total_duration_written = 0
     for cg_id, channel_group in channel_groups.items():
-        logging.debug('channel group: {}'.format(channel_group))
+        logger.debug('channel group: {}'.format(channel_group))
 
-        crs = util.fmt_channel_ranges(channel_group['channels'])
         # TODO: Check file name length, shorten if > 256 characters
         # Possible parameters: outfile prefix [outfile], channel group id [cg_id]
+        # channel ranges from consecutive channels, for output file naming
+        crs = util.fmt_channel_ranges(channel_group['channels'])
         output_basename = fname_template.format(prefix=out_prefix, cg_id=cg_id, crs=crs)
         output_fname = ''.join([output_basename, out_fext])
         output_file_path = op.join(out_path, output_fname)
 
-        time_written = 0
-        for file_mode, input_file_path in enumerate(cli_args.target):
-            duration = None if cli_args.duration is None else cli_args.duration - time_written
+        duration_written = 0
+        # First target, file mode is write, after that, append to output file
+        for file_mode, target_metadata in enumerate(targets_metadata_list):
+            duration = None if cli_args.duration is None else cli_args.duration - duration_written
+            target_path = target_metadata['TARGET']
+
+            logger.debug('Starting conversion for target {}'.format(target_path))
 
             if not cli_args.dry_run and WRITE_DATA:
-                time_written += continuous_to_dat(
-                    input_path=op.abspath(op.expanduser(input_file_path)),
+                duration_written += continuous_to_dat(
+                    target_metadata=target_metadata,
                     output_path=output_file_path,
                     channel_group=channel_group,
-                    dead_channels=dead_channels,
+                    dead_channel_ids=dead_channels,
                     zero_dead_channels=cli_args.zero_dead_channels,
-                    proc_node=cfg['FPGA_NODE'],
                     file_mode='a' if file_mode else 'w',
                     duration=duration)
+            total_duration_written += duration_written
 
         # create the per-group .prb files
         # FIXME: Dead channels are big mess
@@ -313,7 +319,8 @@ def main(args):
             prb_out.write('dead_channels = {}\n'.format(pprint.pformat(dead_channels)))
             prb_out.write('channel_groups = {}'.format(pprint.pformat(cg_out)))
 
-        # FIXME: Generation of .prm files
+        # FIXME: Generation of .prm
+        # For now in separate script. Should take a .prm template that will be adjusted
         # # Template parameter file
         # prm_file_input = cli_args.params
         # with open(op.join(out_path, output_basename + '.prm'), 'w') as prm_out:
@@ -328,7 +335,4 @@ def main(args):
         #                                 raw_file=output_file_path,
         #                                 n_channels=len(channel_group['channels'])))
 
-    logging.debug('Done! Total data length written: {}'.format(util.fmt_time(time_written)))
-
-if __name__ == '__main__':
-    main('~/data/2014-10-30_15-04-50 -l ~/data/m0001_16.prb -o ~/data/testing -D 120'.split(' '))
+        logger.debug('Done! Total data length written: {}'.format(util.fmt_time(total_duration_written)))

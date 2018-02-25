@@ -10,7 +10,7 @@ import sys
 import subprocess
 import oio
 
-from .lib.constants import LOG_LEVEL_VERBOSE
+from dataman.lib.constants import LOG_LEVEL_VERBOSE
 
 __version__ = '0.1.5'
 
@@ -23,8 +23,7 @@ except subprocess.CalledProcessError as e:
 os.chdir(current_path)
 
 NO_EXIT_CONFIRMATION = True
-LOG_LEVEL = logging.INFO
-log_level = LOG_LEVEL
+LOG_LEVEL = logging.DEBUG
 
 
 class DataMan(cmd.Cmd):
@@ -167,7 +166,6 @@ def main():
 
     # some other command was given
     else:
-        # logger.debug('Command {}, args: {:}'.format(cli_args.command, ' '.join(cmd_args)))
         dm = DataMan()
         dm.precmd('')
         dm.onecmd('{} {}'.format(cli_args.command, ' '.join(cmd_args)))

@@ -1,3 +1,3 @@
 # -*- coding: utf-8 -*-
 
-LOG_LEVEL_VERBOSE = 9
+LOG_LEVEL_VERBOSE = 5
