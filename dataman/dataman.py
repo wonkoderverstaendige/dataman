@@ -9,7 +9,6 @@ import os.path as op
 import sys
 import subprocess
 import oio
-
 from dataman.lib.constants import LOG_LEVEL_VERBOSE
 
 __version__ = '0.1.5'
@@ -23,7 +22,8 @@ except subprocess.CalledProcessError as e:
 os.chdir(current_path)
 
 NO_EXIT_CONFIRMATION = True
-LOG_LEVEL = logging.DEBUG
+LOG_LEVEL_DEFAULT = logging.INFO
+LOG_LEVEL_DEBUG = logging.DEBUG
 
 
 class DataMan(cmd.Cmd):
@@ -127,7 +127,7 @@ def main():
         split   Split file into separate files bundling channels
         ''')
     parser.add_argument('command', help='Command to execute', nargs='?', default=None)
-    parser.add_argument('-v', '--verbose', action='store_true',
+    parser.add_argument('-v', '--verbose', action='count',
                         help='Debug mode -- verbose output, no confirmations.')
     parser.add_argument('--version', action='version', version='%(prog)s {version}'.format(version=__version__))
     parser.add_argument('-h', '--help', action='store_true', help='Show help text.')
@@ -148,7 +148,14 @@ def main():
     #     cmd_args.append('-v')
 
     logging.addLevelName(LOG_LEVEL_VERBOSE, 'VERBOSE')
-    log_level = LOG_LEVEL_VERBOSE if cli_args.verbose else LOG_LEVEL
+
+    if cli_args.verbose is None:
+        log_level = LOG_LEVEL_DEFAULT
+    elif cli_args.verbose == 1:
+        log_level = LOG_LEVEL_DEBUG
+    elif cli_args.verbose > 1:
+        log_level = LOG_LEVEL_VERBOSE
+
     logging.basicConfig(level=log_level,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
