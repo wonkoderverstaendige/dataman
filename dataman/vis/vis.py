@@ -160,7 +160,7 @@ class Vis(app.Canvas):
 
     def _get_target_config(self, *args, **kwargs):
         self.logger.debug('Target found: {}'.format(self.format.FMT_NAME))
-        return self.format.config(self.target_path, *args, **kwargs)
+        return self.format.metadata(self.target_path, *args, **kwargs)
 
     def set_scale(self, factor_x=1.0, factor_y=1.0, scale_x=None, scale_y=None):
         self.dirty = True
