@@ -47,9 +47,9 @@ def continuous_to_dat(target_metadata, output_path, channel_group,
     logger.log(level=LOG_LEVEL_VERBOSE, msg='Target metadata: {}'.format(pformat(target_metadata, indent=2)))
 
     # NOTE: Channel numbers zero-based in configuration, but not in file name space. Grml.
-    data_channel_ids = [cid + 1 for cid in channel_group['channels']]
-    ref_channel_ids = [rid + 1 for rid in channel_group['reference']] if "reference" in channel_group else []
-    dead_channel_ids = [did + 1 for did in dead_channel_ids]
+    data_channel_ids = channel_group['channels']
+    ref_channel_ids = [rid for rid in channel_group['reference']] if "reference" in channel_group else []
+    dead_channel_ids = [did for did in dead_channel_ids]
     logger.debug("Zeroing dead channels: {}, dead (OE) channels: {}".format(zero_dead_channels, dead_channel_ids))
     dead_channels_indices = [data_channel_ids.index(dc) for dc in dead_channel_ids if dc in data_channel_ids]
 
@@ -61,8 +61,8 @@ def continuous_to_dat(target_metadata, output_path, channel_group,
             # Loop over all sub-recordings
             for sub_id, subset in target_metadata['SUBSETS'].items():
                 logger.debug('Converting sub_id {}'.format(sub_id))
-                data_file_paths = [subset['FILES'][cid - 1]['FILEPATH'] for cid in data_channel_ids]
-                ref_file_paths = [subset['FILES'][rid - 1]['FILEPATH'] for rid in ref_channel_ids]
+                data_file_paths = [subset['FILES'][cid]['FILEPATH'] for cid in data_channel_ids]
+                ref_file_paths = [subset['FILES'][rid]['FILEPATH'] for rid in ref_channel_ids]
                 logger.log(level=LOG_LEVEL_VERBOSE, msg=data_file_paths)
 
                 data_files = [stack.enter_context(oe.ContinuousFile(f)) for f in data_file_paths]
