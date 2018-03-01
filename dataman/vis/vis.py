@@ -8,7 +8,6 @@ import logging
 import math
 import os
 import os.path as op
-import sys
 import time
 from multiprocessing import Queue
 import numpy as np
