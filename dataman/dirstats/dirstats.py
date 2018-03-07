@@ -5,8 +5,8 @@ from __future__ import print_function
 import logging
 import os
 import sys
-from oio.formats import open_ephys, kwik, dat
-from oio.lib import tools
+from dataman.formats import open_ephys, kwik, dat
+from dataman.lib import util
 from termcolor import colored
 
 EXT_VIDEO = ['.avi', '.mp4', '.mkv', '.wmv']
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class Column:
-    def __init__(self, name, width=3, fmt=':', align='^', *args, **kwargs):
+    def __init__(self, name, width=3, fmt=':', align='^'):
         self.name = name
         self.w = width
         self.align = align
@@ -57,18 +57,18 @@ def contains_data(path, pre_walk=None):
 
 def dir_details(path, pre_walk=None):
     logger.debug('dir_details path: {}, pre_walked: {}'.format(path, pre_walk is not None))
-    root, dirs, files = tools.path_content(path) if pre_walk is None else pre_walk
+    root, dirs, files = util.path_content(path) if pre_walk is None else pre_walk
 
     # Sizes
     name = os.path.basename(path)
-    size = tools.dir_size(path)
+    size = util.dir_size(path)
 
     # File type counts
     num_files = len(files)
-    num_vid = len([f for f in files if tools.fext(f) in EXT_VIDEO])
-    num_img = len([f for f in files if tools.fext(f) in EXT_IMAGE])
-    num_snd = len([f for f in files if tools.fext(f) in EXT_SOUND])
-    num_doc = len([f for f in files if tools.fext(f) in EXT_DOC])
+    num_vid = len([f for f in files if util.fext(f) in EXT_VIDEO])
+    num_img = len([f for f in files if util.fext(f) in EXT_IMAGE])
+    num_snd = len([f for f in files if util.fext(f) in EXT_SOUND])
+    num_doc = len([f for f in files if util.fext(f) in EXT_DOC])
     data_fmt = contains_data(path, pre_walk=(root, dirs, files))
 
     return dict(fname=name, size=size, num_files=num_files, num_vid=num_vid,
@@ -91,7 +91,7 @@ def gather(path):
         to the details of a single directory (including the given as
         [path]) in a dictionary.
     """
-    root, dirs, files = tools.path_content(path)
+    root, dirs, files = util.path_content(path)
 
     details = [dir_details(root)]
     for d in dirs:
@@ -123,7 +123,7 @@ def mk_row(row, colorized=True, cols=DEFAULT_COLS, sepr='|'):
         if c == 'fname':
             row_str += prettify(fit_str(row[c], 28), sepr=sepr, align='<', width=28)
         elif c == 'size':
-            row_str += prettify(tools.fmt_size(row[c], unit='', sep='', col=True, pad=7),
+            row_str += prettify(util.fmt_size(row[c], unit='', sep='', col=True, pad=7),
 
                                 sepr=sepr, align='>', width=0)
 
@@ -162,18 +162,18 @@ def mk_row(row, colorized=True, cols=DEFAULT_COLS, sepr='|'):
     return row_str
 
 
-get_ch = tools.find_getch()
+get_ch = util.find_getch()
 
 
 def print_table(rows, page_size=-1):
-    term_h, term_w = tools.terminal_size()
+    term_h, term_w = util.terminal_size()
     if page_size is not None and page_size < 1:
         page_size = term_h - 5
     line_length = None
     for i, row in enumerate(rows):
         row_string = mk_row(row)
         if line_length is None:
-            line_length = len(tools.strip_ansi(row_string))
+            line_length = len(util.strip_ansi(row_string))
 
             # pause after printing full page of rows
         if page_size is not None and page_size > 1 and i % (page_size + 1) == 0:

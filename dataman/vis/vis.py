@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Based on vispy gallery example "realtime signals"
-# Copyright (c) 2015, Vispy Development Team.
-# Distributed under the (new) BSD License.
 
 import logging
 import math
@@ -11,10 +8,8 @@ import os.path as op
 import time
 from multiprocessing import Queue
 import numpy as np
-from pprint import pformat, pprint
 
-from oio import util as oio_util
-from oio.lib import tools, SharedBuffer
+from dataman.lib import SharedBuffer, util
 
 from vispy import app, gloo
 from vispy.util import keys
@@ -39,12 +34,11 @@ class Vis(app.Canvas):
         # Target configuration (format, sampling rate, sizes...)
         self.target_path = target_path
         self.logger.debug('Target path: {}'.format(target_path))
-        self.format = oio_util.detect_format(self.target_path)
+        self.format = util.detect_format(self.target_path)
         self.logger.debug('Target module: {}'.format(self.format))
         assert self.format is not None
 
         self.metadata = self._get_target_config(*args, **kwargs)
-        # pprint(self.metadata)
 
         # TODO: Have .dat format join in on the new format fun...
         if 'HEADER' in self.metadata:
@@ -70,7 +64,7 @@ class Vis(app.Canvas):
             'From target: {:.2f} Hz, {} channels, {} samples'.format(self.fs, self.n_channels, self.n_samples_total))
         self.channel_order = channels  # if None: no particular order
 
-        self.duration_total = tools.fmt_time(self.n_samples_total / self.fs)
+        self.duration_total = util.fmt_time(self.n_samples_total / self.fs)
 
         # Buffer to store all the pre-loaded signals
         self.buf = SharedBuffer.SharedBuffer()
@@ -281,7 +275,7 @@ class Vis(app.Canvas):
         t_r = x_r * self.n_cols - math.floor(x_r * self.n_cols)
         t_sample = (t_r * self.buffer_length + self.offset * 1024)  # self.cfg['HEADER']['block_size']
         t_sec = t_sample / self.fs
-        self.logger.info('Sample {} @ {}'.format(int(t_sample), tools.fmt_time(t_sec)))
+        self.logger.info('Sample {} @ {}'.format(int(t_sample), util.fmt_time(t_sec)))
 
     def on_timer(self, _):
         """Frame update callback."""
@@ -326,8 +320,8 @@ def run(*args, **kwargs):
 
     cli_args = parser.parse_args(*args)
     if 'layout' in cli_args and cli_args.layout is not None:
-        layout = oio_util.run_prb(cli_args.layout)
-        channels, bad_channels = oio_util.flat_channel_list(layout)[:cli_args.channels]
+        layout = util.run_prb(cli_args.layout)
+        channels, bad_channels = util.flat_channel_list(layout)[:cli_args.channels]
     else:
         channels = None
         bad_channels = None

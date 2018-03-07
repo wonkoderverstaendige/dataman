@@ -1,4 +1,6 @@
 # Set default logging handler to avoid "No handler found" warnings.
+import dataman.lib.util
+
 import logging
 try:  # Python 2.7+
     from logging import NullHandler

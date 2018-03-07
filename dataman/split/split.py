@@ -1,7 +1,7 @@
 import os
 import numpy as np
-from oio.util import run_prb, make_prm
-from oio.formats import dat
+from dataman.lib.util import run_prb
+from dataman.formats import dat
 import logging
 from tqdm import tqdm
 import sys
@@ -83,8 +83,6 @@ def main(args):
 #            make_prm(outfile.name, 'tetrode.prb')
 
     del mm
-
-
 
     try:
         if cli_args.clean:

@@ -1,8 +1,8 @@
 from os import path as op, remove
 from shutil import copyfile
 import numpy as np
-from oio.util import get_batch_size, run_prb, flat_channel_list, has_prb
-from oio.formats import dat
+from dataman.lib.util import get_batch_size, run_prb, flat_channel_list, has_prb
+from dataman.formats import dat
 import logging
 from tqdm import trange
 
@@ -31,7 +31,7 @@ def ref(dat_path, ref_path=None, keep=False, inplace=False, *args, **kwargs):
 
 
 def subtract_reference(dat_path, ref_path, precision='single', inplace=False,
-                       n_channels=64, ch_idx_bad=None, zero_bad_channels=False, *args, **kwargs):
+                       n_channels=64, ch_idx_bad=None, zero_bad_channels=False):
     # if inplace, just overwrite, in_file, else, make copy of in_file
     # FIXME: Also memmap the reference file? Should be small even for long recordings...
     # FIXME: If not inplace, the file should be opened read only!
@@ -39,8 +39,8 @@ def subtract_reference(dat_path, ref_path, precision='single', inplace=False,
     logger.debug('Subtracting {} from {}'.format(ref_path, dat_path))
     logger.debug('Precision: {}, inplace={} with {} channels'.format(precision, inplace, n_channels))
     logger.debug('Opening files, dat: {}; ref: {}'.format(dat_path, ref_path))
-    with open(dat_path, 'r+b') as dat, open(ref_path, 'rb') as mu:
-        dat_arr = np.memmap(dat, dtype='int16').reshape(-1, n_channels)
+    with open(dat_path, 'r+b') as dat_file, open(ref_path, 'rb') as mu:
+        dat_arr = np.memmap(dat_file, dtype='int16').reshape(-1, n_channels)
         mu_arr = np.fromfile(mu, dtype=precision).reshape(-1, 1)
         assert (dat_arr.shape[0] == mu_arr.shape[0])
 
@@ -75,13 +75,13 @@ def make_ref_file(dat_path, n_channels, ref_out_fname=None, *args, **kwargs):
         fname, ext = op.splitext(dat_path)
         ref_out_fname = fname + '_reference' + ext
 
-    with open(dat_path, 'rb') as dat, open(ref_out_fname, 'wb+') as mu:
-        dat_arr = np.memmap(dat, mode='r', dtype='int16').reshape(-1, n_channels)
+    with open(dat_path, 'rb') as dat_file, open(ref_out_fname, 'wb+') as mu:
+        dat_arr = np.memmap(dat_file, mode='r', dtype='int16').reshape(-1, n_channels)
         _batch_reference(dat_arr, mu, *args, **kwargs)
     return ref_out_fname
 
 
-def _batch_reference(arr_like, out_file, ch_idx_good=None, ch_idx_bad=None, precision='float32', *args, **kwargs):
+def _batch_reference(arr_like, out_file, ch_idx_good=None, ch_idx_bad=None, precision='float32'):
     # out_file is file pointer!
     batch_size, n_batches, batch_size_last = get_batch_size(arr_like)
     assert not (ch_idx_good is not None and ch_idx_bad is not None)

@@ -2,9 +2,9 @@ import numpy as np
 import logging
 import os
 import os.path as op
-from oio import util
-from oio.formats import valid_formats
-from oio.formats import open_ephys as oe
+from dataman.lib import util
+from dataman.formats import get_valid_formats
+from dataman.formats import open_ephys as oe
 import pprint
 from contextlib import ExitStack
 import time
@@ -16,7 +16,7 @@ from pprint import pformat
 logger = logging.getLogger(__name__)
 
 WRITE_DATA = True
-FORMATS = {fmt.FMT_NAME.lower(): fmt for fmt in valid_formats}
+FORMATS = {fmt.FMT_NAME.lower(): fmt for fmt in get_valid_formats()}
 
 LOG_STR_INPUT = '==> Input: {path}'
 LOG_STR_OUTPUT = '<== Output {path}'
