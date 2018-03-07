@@ -91,12 +91,20 @@ class DataStreamer(Streamer.Streamer):
         self.files = first_subset['FILES']
 
     def reposition(self, offset):
+        """Reposition current buffer representing data files. Also reorders channels according to
+        channel order map.
+        """
         logger.debug('Rolling to position {}'.format(offset))
         n_samples = self.buffer.buffer.shape[1]
 
         for ch, ch_dict in self.files.items():
+            if self.channel_order is None:
+                ch_pos = ch
+            else:
+                ch_pos = self.channel_order.index(ch)
+
             data = read_record(ch_dict['FILEPATH'], offset=offset)[:n_samples]
-            self.buffer.put_data(data, channel=ch)
+            self.buffer.put_data(data, channel=ch_pos)
 
 
 def _ids_from_fname(fn, channel_type='CH'):

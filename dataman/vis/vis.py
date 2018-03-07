@@ -27,7 +27,7 @@ BUFFER_LENGTH = int(3e4)
 
 class Vis(app.Canvas):
     def __init__(self, target_path, n_cols=1, channels=None, *args, **kwargs):
-        app.Canvas.__init__(self, title='Use your wheel to zoom!', keys='interactive', size=(1900, 1000),
+        app.Canvas.__init__(self, title=target_path, keys='interactive', size=(1900, 1000),
                             position=(0, 0), app='pyqt5')
         self.logger = logging.getLogger(__name__)
 
@@ -111,7 +111,8 @@ class Vis(app.Canvas):
         """
         self.logger.debug("Spawning streaming process...")
         self.streamer = self.format.DataStreamer(queue=self.stream_queue, raw=self.buf.raw,
-                                                 target_path=self.target_path, metadata=self.metadata)
+                                                 target_path=self.target_path, metadata=self.metadata,
+                                                 channel_order=self.channel_order)
         self.streamer._daemonic = True
         # self.stream_queue.put(('offset', 0))
         self.streamer.start()
@@ -217,7 +218,7 @@ class Vis(app.Canvas):
 
             # Jump to beginning
             if keys.CONTROL in event.modifiers:
-                delta = self.n_samples_total
+                delta *= 100
 
             if event.key == 'Left':
                 self.set_offset(relative=-delta)

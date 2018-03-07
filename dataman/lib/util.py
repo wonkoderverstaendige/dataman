@@ -30,7 +30,7 @@ def detect_format(path, return_singlular=True):
         return_singlular: bool, indicate whether to allow and return only a single format
 
     Returns:
-        bool
+        Single data format object, or list of formats
     """
 
     formats = [fmt for fmt in get_valid_formats() if fmt.detect(path)]

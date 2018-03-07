@@ -20,7 +20,7 @@ TIMEOUT = 5
 
 
 class Streamer(mp.Process):
-    def __init__(self, queue, raw, update_interval=0.02):
+    def __init__(self, queue, raw, update_interval=0.02, channel_order=None):
         super(Streamer, self).__init__()
 
         # #### WARNING #####
@@ -43,6 +43,7 @@ class Streamer(mp.Process):
         # Shared Buffer
         self.raw = raw
         self.buffer = SharedBuffer()
+        self.channel_order = channel_order
 
         # # Data specifics
         self.offset = None
