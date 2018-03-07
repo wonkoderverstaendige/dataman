@@ -26,6 +26,10 @@ class DataStreamer(Streamer.Streamer):
         logger.debug('DAT-File Streamer Initialized at {}!'.format(target_path))
         self.cfg = metadata
 
+        if self.channel_order is not None:
+            logger.error('Using .vis with channel map not supported!')
+            raise SystemExit
+
     def reposition(self, offset):
         logger.debug('Rolling to position {}'.format(offset))
 
