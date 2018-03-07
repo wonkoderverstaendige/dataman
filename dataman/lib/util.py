@@ -18,8 +18,9 @@ def get_batch_size(arr, ram_limit=DEFAULT_MEMORY_LIMIT_MB):
     """Return batch size, number of full batches and remainder size for 2D array."""
 
     batch_size = int(ram_limit * 1e6 / arr.shape[1] / arr.dtype.itemsize)
-    remainder = arr.shape[0] // batch_size, arr.shape[0] % batch_size
-    return batch_size, remainder
+    n_batches = arr.shape[0] // batch_size
+    remainder = arr.shape[0] % batch_size
+    return batch_size, n_batches, remainder
 
 
 def detect_format(path, return_singlular=True):
