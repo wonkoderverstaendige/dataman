@@ -8,11 +8,12 @@ import os
 import os.path as op
 import sys
 import subprocess
-import oio
+from dataman.lib.constants import LOG_LEVEL_VERBOSE
 
-from .lib.constants import LOG_LEVEL_VERBOSE
+LOG_LEVEL_DEFAULT = logging.INFO
+LOG_LEVEL_DEBUG = logging.DEBUG
 
-__version__ = '0.1.5'
+__version__ = '0.2.0'
 
 current_path = os.getcwd()
 try:
@@ -21,10 +22,6 @@ try:
 except subprocess.CalledProcessError as e:
     GIT_VERSION = "Unknown"
 os.chdir(current_path)
-
-NO_EXIT_CONFIRMATION = True
-LOG_LEVEL = logging.INFO
-log_level = LOG_LEVEL
 
 
 class DataMan(cmd.Cmd):
@@ -38,11 +35,14 @@ class DataMan(cmd.Cmd):
 
     def preloop(self):
         self.log.debug("Starting DataMan CLI")
+        self.intro_dbg()
 
     def precmd(self, line):
-        self.log.debug('Starting dataman v{} @git [{}]'.format(__version__, GIT_VERSION))
-        self.log.debug('Using oio v{} @git [{}]'.format(oio.__version__, oio.GIT_VERSION))
+        self.intro_dbg()
         return line
+
+    def intro_dbg(self):
+        self.log.debug('Starting dataman v{} @git [{}]'.format(__version__, GIT_VERSION))
 
     def do_ls(self, args_string):
         parser = argparse.ArgumentParser('Recording statistics',)
@@ -74,33 +74,41 @@ class DataMan(cmd.Cmd):
         # import dataman.dirstats.dirstats as ds
         # ds.print_table(ds.gather(path))
 
-    def do_vis(self, args_string):
+    @staticmethod
+    def do_vis(args_string):
         from dataman.vis import vis
         vis.run(args_string.split(' '))
 
-    def do_conv(self, args_string):
+    @staticmethod
+    def do_conv(args_string):
         from dataman.conv import convert
         convert.main(args_string.split(' '))
 
-    def do_ref(self, args_string):
+    @staticmethod
+    def do_ref(args_string):
         from dataman.ref import referencing
         referencing.main(args_string.split(' '))
 
-    def do_split(self, args_string):
+    @staticmethod
+    def do_split(args_string):
         from dataman.split import split
         split.main(args_string.split(' '))
 
-    def do_check(self, args_string):
+    @staticmethod
+    def do_check(args_string):
         pass
 
-    def do_proc(self, args_string):
+    @staticmethod
+    def do_proc(_):
         print(sys.argv)
 
-    def do_exit(self, args_string):
+    @staticmethod
+    def do_exit(_):
         """Exit"""
         return True
 
-    def do_EOF(self, args_string):
+    @staticmethod
+    def do_EOF(_):
         """Exit"""
         return True
 
@@ -124,8 +132,8 @@ def main():
         split   Split file into separate files bundling channels
         ''')
     parser.add_argument('command', help='Command to execute', nargs='?', default=None)
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='Debug mode -- verbose output, no confirmations.')
+    parser.add_argument('-v', '--verbose', action='count',
+                        help='Verbosity level -v: Debug, -vv: Verbose mode.')
     parser.add_argument('--version', action='version', version='%(prog)s {version}'.format(version=__version__))
     parser.add_argument('-h', '--help', action='store_true', help='Show help text.')
 
@@ -135,23 +143,23 @@ def main():
         parser.print_help()
         sys.exit(0)
 
-    if cli_args.verbose:
-        NO_EXIT_CONFIRMATION = True
-
     # we need to re-append arguments that should go down the rabbit hole
     if cli_args.help:
         cmd_args.append('-h')
-    # if cli_args.verbose:
-    #     cmd_args.append('-v')
 
     logging.addLevelName(LOG_LEVEL_VERBOSE, 'VERBOSE')
-    log_level = LOG_LEVEL_VERBOSE if cli_args.verbose else LOG_LEVEL
+
+    if cli_args.verbose is None:
+        log_level = LOG_LEVEL_DEFAULT
+    else:
+        log_level = LOG_LEVEL_DEBUG if cli_args.verbose == 1 else LOG_LEVEL_VERBOSE
+
     logging.basicConfig(level=log_level,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
 
-    logger.debug('CLI_ARGS: {}'.format(cli_args))
-    logger.debug('CMD_ARGS: {}'.format(cmd_args))
+    logger.log(level=LOG_LEVEL_VERBOSE, msg='CLI_ARGS: {}'.format(cli_args))
+    logger.log(level=LOG_LEVEL_VERBOSE, msg='CMD_ARGS: {}'.format(cmd_args))
 
     # start cli
     if cli_args.command in [None, 'cli']:
@@ -163,8 +171,9 @@ def main():
 
     # some other command was given
     else:
-        logger.debug('Command {}, args: {:}'.format(cli_args.command, ' '.join(cmd_args)))
-        DataMan().onecmd('{} {}'.format(cli_args.command, ' '.join(cmd_args)))
+        dm = DataMan()
+        dm.precmd('')
+        dm.onecmd('{} {}'.format(cli_args.command, ' '.join(cmd_args)))
 
 
 if __name__ == "__main__":

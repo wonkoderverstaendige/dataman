@@ -1,8 +1,8 @@
 from os import path as op, remove
 from shutil import copyfile
 import numpy as np
-from oio.util import get_batch_size, run_prb, flat_channel_list, has_prb
-from oio.formats import dat
+from dataman.lib.util import get_batch_size, run_prb, flat_channel_list, has_prb
+from dataman.formats import dat
 import logging
 from tqdm import trange
 
@@ -39,8 +39,8 @@ def subtract_reference(dat_path, ref_path, precision='single', inplace=False,
     logger.debug('Subtracting {} from {}'.format(ref_path, dat_path))
     logger.debug('Precision: {}, inplace={} with {} channels'.format(precision, inplace, n_channels))
     logger.debug('Opening files, dat: {}; ref: {}'.format(dat_path, ref_path))
-    with open(dat_path, 'r+b') as dat, open(ref_path, 'rb') as mu:
-        dat_arr = np.memmap(dat, dtype='int16').reshape(-1, n_channels)
+    with open(dat_path, 'r+b') as dat_file, open(ref_path, 'rb') as mu:
+        dat_arr = np.memmap(dat_file, dtype='int16').reshape(-1, n_channels)
         mu_arr = np.fromfile(mu, dtype=precision).reshape(-1, 1)
         assert (dat_arr.shape[0] == mu_arr.shape[0])
 
@@ -75,8 +75,8 @@ def make_ref_file(dat_path, n_channels, ref_out_fname=None, *args, **kwargs):
         fname, ext = op.splitext(dat_path)
         ref_out_fname = fname + '_reference' + ext
 
-    with open(dat_path, 'rb') as dat, open(ref_out_fname, 'wb+') as mu:
-        dat_arr = np.memmap(dat, mode='r', dtype='int16').reshape(-1, n_channels)
+    with open(dat_path, 'rb') as dat_file, open(ref_out_fname, 'wb+') as mu:
+        dat_arr = np.memmap(dat_file, mode='r', dtype='int16').reshape(-1, n_channels)
         _batch_reference(dat_arr, mu, *args, **kwargs)
     return ref_out_fname
 
@@ -127,7 +127,7 @@ def main(args):
     cli_args = parser.parse_args(args)
 
     n_channels = cli_args.channels if 'channels' in cli_args else None
-    cfg = dat.config(cli_args.input, n_channels=n_channels)
+    cfg = dat.metadata_from_target(cli_args.input, n_channels=n_channels)
     if n_channels is None:
         n_channels = cfg['CHANNELS']['n_channels']
     logger.debug(cfg)

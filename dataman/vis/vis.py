@@ -1,24 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Based on vispy gallery example "realtime signals"
-# Copyright (c) 2015, Vispy Development Team.
-# Distributed under the (new) BSD License.
 
 import logging
 import math
 import os
 import os.path as op
-import sys
 import time
 from multiprocessing import Queue
 import numpy as np
-from oio import util as oio_util
 
-from oio.lib import tools, SharedBuffer
+from dataman.lib import SharedBuffer, util
 
 from vispy import app, gloo
 from vispy.util import keys
-
 
 # Load vertex and fragment shaders
 SHADER_PATH = os.path.join(os.path.dirname(__file__), 'shaders')
@@ -33,26 +27,44 @@ BUFFER_LENGTH = int(3e4)
 
 class Vis(app.Canvas):
     def __init__(self, target_path, n_cols=1, channels=None, *args, **kwargs):
-        app.Canvas.__init__(self, title='Use your wheel to zoom!', keys='interactive', size=(1900, 1000),
+        app.Canvas.__init__(self, title=target_path, keys='interactive', size=(1900, 1000),
                             position=(0, 0), app='pyqt5')
         self.logger = logging.getLogger(__name__)
 
         # Target configuration (format, sampling rate, sizes...)
         self.target_path = target_path
         self.logger.debug('Target path: {}'.format(target_path))
-        self.format = oio_util.detect_format(self.target_path)
+        self.format = util.detect_format(self.target_path)
         self.logger.debug('Target module: {}'.format(self.format))
         assert self.format is not None
 
-        self.cfg = self._get_target_config(*args, **kwargs)
-        self.logger.debug(self.cfg)
+        self.metadata = self._get_target_config(*args, **kwargs)
 
-        self.fs = self.cfg['HEADER']['sampling_rate']
-        self.n_channels = self.cfg['CHANNELS']['n_channels']
+        # TODO: Have .dat format join in on the new format fun...
+        if 'HEADER' in self.metadata:
+            self.logger.debug('Using legacy .dat file metadata dictionary layout')
+            self.fs = self.metadata['HEADER']['sampling_rate']
+            self.n_samples_total = int(self.metadata['HEADER']['n_samples'])
+            self.n_channels = self.metadata['CHANNELS']['n_channels']
+            self.block_size = self.metadata['HEADER']['block_size']
+
+        elif 'SUBSETS' in self.metadata:
+            # FIXME: Only traverses first subset.
+            self.logger.debug('Using new style metadata dictionary layout')
+            # get number of channels and sampling rate from first subset
+            first_subset = next(iter(self.metadata['SUBSETS'].values()))
+            self.fs = first_subset['JOINT_HEADERS']['sampling_rate']
+            self.n_samples_total = int(first_subset['JOINT_HEADERS']['n_samples'])
+            self.n_channels = len(first_subset['FILES'])
+            self.block_size = first_subset['JOINT_HEADERS']['block_size']
+        else:
+            raise ValueError('Unknown metadata format from target.')
+
+        self.logger.debug(
+            'From target: {:.2f} Hz, {} channels, {} samples'.format(self.fs, self.n_channels, self.n_samples_total))
         self.channel_order = channels  # if None: no particular order
 
-        self.n_samples_total = int(self.cfg['HEADER']['n_samples'])
-        self.duration_total = tools.fmt_time(self.n_samples_total / self.fs)
+        self.duration_total = util.fmt_time(self.n_samples_total / self.fs)
 
         # Buffer to store all the pre-loaded signals
         self.buf = SharedBuffer.SharedBuffer()
@@ -73,12 +85,8 @@ class Vis(app.Canvas):
         self.n_cols = int(n_cols)
         self.n_rows = int(math.ceil(self.n_channels / self.n_cols))
 
-        self.logger.debug('n_channels: {}, col/row: {}, buffer_length: {}, '
-                          ' total_samples: {}, total_duration: {}'.format(self.n_channels,
-                                                                          (self.n_cols, self.n_rows),
-                                                                          self.buffer_length,
-                                                                          self.n_samples_total,
-                                                                          self.duration_total))
+        self.logger.debug('col/row: {}, buffer_length: {}'.format((self.n_cols, self.n_rows),
+                                                                  self.buffer_length))
 
         # Most of the magic happens in the vertex shader, moving the samples into "position" using
         # an affine transform based on number of columns and rows for the plot, scaling, etc.
@@ -103,9 +111,10 @@ class Vis(app.Canvas):
         """
         self.logger.debug("Spawning streaming process...")
         self.streamer = self.format.DataStreamer(queue=self.stream_queue, raw=self.buf.raw,
-                                                 target_path=self.target_path, config=self.cfg)
+                                                 target_path=self.target_path, metadata=self.metadata,
+                                                 channel_order=self.channel_order)
         self.streamer._daemonic = True
-        self.stream_queue.put(('offset', 0))
+        # self.stream_queue.put(('offset', 0))
         self.streamer.start()
 
     def stop_streaming(self):
@@ -160,7 +169,7 @@ class Vis(app.Canvas):
 
     def _get_target_config(self, *args, **kwargs):
         self.logger.debug('Target found: {}'.format(self.format.FMT_NAME))
-        return self.format.config(self.target_path, *args, **kwargs)
+        return self.format.metadata_from_target(self.target_path, *args, **kwargs)
 
     def set_scale(self, factor_x=1.0, factor_y=1.0, scale_x=None, scale_y=None):
         self.dirty = True
@@ -180,8 +189,8 @@ class Vis(app.Canvas):
         self.offset += int(relative)
         if self.offset < 0:
             self.offset = 0
-        elif self.offset >= (self.n_samples_total - self.buffer_length) // self.cfg['HEADER']['block_size']:
-            self.offset = (self.n_samples_total - self.buffer_length) // self.cfg['HEADER']['block_size']
+        elif self.offset >= (self.n_samples_total - self.buffer_length) // self.block_size:
+            self.offset = (self.n_samples_total - self.buffer_length) // self.block_size
 
         if old_offset != self.offset:
             self.dirty = True
@@ -209,7 +218,7 @@ class Vis(app.Canvas):
 
             # Jump to beginning
             if keys.CONTROL in event.modifiers:
-                delta = self.n_samples_total
+                delta *= 100
 
             if event.key == 'Left':
                 self.set_offset(relative=-delta)
@@ -267,10 +276,12 @@ class Vis(app.Canvas):
         t_r = x_r * self.n_cols - math.floor(x_r * self.n_cols)
         t_sample = (t_r * self.buffer_length + self.offset * 1024)  # self.cfg['HEADER']['block_size']
         t_sec = t_sample / self.fs
-        self.logger.info('Sample {} @ {}'.format(int(t_sample), tools.fmt_time(t_sec)))
+        self.logger.info('Sample {} @ {}'.format(int(t_sample), util.fmt_time(t_sec)))
 
     def on_timer(self, _):
         """Frame update callback."""
+        self.stream_queue.put(('heartbeat', time.time()))
+
         if self.dirty:
             if self.is_streaming:
                 self.stream_queue.put(('offset', self.offset))
@@ -310,8 +321,8 @@ def run(*args, **kwargs):
 
     cli_args = parser.parse_args(*args)
     if 'layout' in cli_args and cli_args.layout is not None:
-        layout = oio_util.run_prb(cli_args.layout)
-        channels, bad_channels = oio_util.flat_channel_list(layout)[:cli_args.channels]
+        layout = util.run_prb(cli_args.layout)
+        channels, bad_channels = util.flat_channel_list(layout)[:cli_args.channels]
     else:
         channels = None
         bad_channels = None
