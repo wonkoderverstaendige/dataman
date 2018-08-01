@@ -356,7 +356,9 @@ def metadata_from_target(target_dir, channel_type='CH', *args, **kwargs):
                 'TARGET': str(Path(target_dir).resolve())}
 
     # Grab metadata from the settings.xml file in the base directory
-    metadata.update(metadata_from_xml(target_dir))
+    print(target_dir)
+    xml_md = metadata_from_xml(target_dir)
+    metadata.update(xml_md)
 
     logger.debug('Searching FPGA node in signal chain')
     metadata['FPGA_NODE'] = _fpga_node(metadata['SIGNALCHAIN'])
@@ -456,6 +458,8 @@ def metadata_from_xml(base_dir):
     """
     logger.debug('Looking for settings.xml in {} ...'.format(base_dir))
     xml_path = find_settings_xml(base_dir)
+    if xml_path is None:
+        raise FileNotFoundError('No settings.xml in path {}'.format(base_dir))
     logger.debug('Found. Reading in xml metadata...')
     root = ETree.parse(xml_path).getroot()
 
