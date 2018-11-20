@@ -95,6 +95,11 @@ class DataMan(cmd.Cmd):
         split.main(args_string.split(' '))
 
     @staticmethod
+    def do_detect(args_string):
+        from dataman.detect import detect
+        detect.main(args_string.split(' '))
+
+    @staticmethod
     def do_check(args_string):
         pass
 

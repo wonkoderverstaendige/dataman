@@ -19,7 +19,8 @@ def main(args):
     parser.add_argument('-c', '--clean', action='store_true', help='Remove the original dat file when successful')
     parser.add_argument('-C', '--channels', type=int, help='Number of channels in input file.')
     parser.add_argument('-d', '--dtype', default='int16')
-    parser.add_argument('-p', '--prefix', default='{infile}_')
+    parser.add_argument('-p', '--prefix', default='tetrode',
+                        help='Prefix to output file name. Default: "tetrode"')  # '{infile}_'
 
     grouping = parser.add_mutually_exclusive_group()
     grouping.add_argument('-l', '--layout', help='Path to probe file defining channel order')
@@ -76,11 +77,6 @@ def main(args):
             for cg_id in range(len(indices)):
                 arr.take(channel_groups[indices[cg_id]]['channels'], axis=1).tofile(out_files[cg_id])
             samples_remaining -= batch_size
-
-#        logger.debug('Writing .prm files')
-#        for outfile in out_files:
-#            print(outfile.name)
-#            make_prm(outfile.name, 'tetrode.prb')
 
     del mm
 
