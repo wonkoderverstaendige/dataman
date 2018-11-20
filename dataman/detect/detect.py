@@ -202,8 +202,8 @@ def main(args):
     target = Path(cli_args.target)
     tetrodes = range(16) if (cli_args.tetrodes is None or not len(cli_args.tetrodes)) else map(int, cli_args.tetrodes)
 
-    start = int(cli_args.start * fs)
-    end = int(cli_args.end * fs)
+    start = int(cli_args.start * fs) if cli_args.start is not None else None
+    end = int(cli_args.end * fs) if cli_args.end is not None else None
 
     for tetrode in tqdm(list(tetrodes), desc='Progress'):
         tqdm.write(f'Detecting spikes for tetrode {tetrode}')
