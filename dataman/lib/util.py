@@ -9,9 +9,18 @@ import logging
 from collections import Counter
 from dataman.formats import get_valid_formats
 from dataman.lib.constants import DEFAULT_MEMORY_LIMIT_MB
+from scipy import signal
 
 ansi_escape = re.compile(r'\x1b[^m]*m')
 logger = logging.getLogger(__name__)
+
+
+def butter_bandpass(lowcut, highcut, fs, order=5):
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = signal.butter(order, [low, high], btype='band')
+    return b, a
 
 
 def get_batch_size(arr, ram_limit=DEFAULT_MEMORY_LIMIT_MB):
@@ -21,6 +30,13 @@ def get_batch_size(arr, ram_limit=DEFAULT_MEMORY_LIMIT_MB):
     n_batches = arr.shape[0] // batch_size
     remainder = arr.shape[0] % batch_size
     return batch_size, n_batches, remainder
+
+
+def get_batches(length, batch_size):
+    batches = [bc * batch_size for bc in range(length // batch_size)]
+    if length - (length // batch_size) * batch_size:
+        batches.append(length - length % batch_size)
+    return batches
 
 
 def detect_format(path, return_singlular=True):
