@@ -8,6 +8,7 @@ import os.path as op
 import time
 from multiprocessing import Queue
 import numpy as np
+from scipy import signal
 
 from dataman.lib import SharedBuffer, util
 
@@ -26,7 +27,7 @@ BUFFER_LENGTH = int(3e4)
 
 
 class Vis(app.Canvas):
-    def __init__(self, target_path, n_cols=1, channels=None, *args, **kwargs):
+    def __init__(self, target_path, n_cols=1, channels=None, start=0, *args, **kwargs):
         app.Canvas.__init__(self, title=target_path, keys='interactive', size=(1900, 1000),
                             position=(0, 0), app='pyqt5')
         self.logger = logging.getLogger(__name__)
@@ -64,6 +65,10 @@ class Vis(app.Canvas):
             'From target: {:.2f} Hz, {} channels, {} samples'.format(self.fs, self.n_channels, self.n_samples_total))
         self.channel_order = channels  # if None: no particular order
 
+        # 300-6000 Hz Highpass filter
+        self.filter = util.butter_bandpass(300, 6000, self.fs)
+        self.apply_filter = False
+
         self.duration_total = util.fmt_time(self.n_samples_total / self.fs)
 
         # Buffer to store all the pre-loaded signals
@@ -80,7 +85,8 @@ class Vis(app.Canvas):
         # running traces, looks cool, but useless for the most part
         self.running = False
         self.dirty = True
-        self.offset = 0
+        self.offset = int(start * self.fs / 1024)
+
         self.drag_offset = 0
         self.n_cols = int(n_cols)
         self.n_rows = int(math.ceil(self.n_channels / self.n_cols))
@@ -98,6 +104,7 @@ class Vis(app.Canvas):
         self._timer = app.Timer('auto', connect=self.on_timer, start=True)
         gloo.set_state(clear_color='black', blend=True,
                        blend_func=('src_alpha', 'one_minus_src_alpha'))
+
         self.show()
 
     def __get_is_streaming(self):
@@ -208,6 +215,10 @@ class Vis(app.Canvas):
             self.running = not self.running
         elif event.key == 'Q':
             self.close()
+        elif event.key == 'f':
+            self.dirty = True
+            self.apply_filter = not self.apply_filter
+
         elif event.key in [keys.LEFT, keys.RIGHT]:
             delta = 2
 
@@ -276,7 +287,8 @@ class Vis(app.Canvas):
         t_r = x_r * self.n_cols - math.floor(x_r * self.n_cols)
         t_sample = (t_r * self.buffer_length + self.offset * 1024)  # self.cfg['HEADER']['block_size']
         t_sec = t_sample / self.fs
-        self.logger.info('Sample {} @ {}'.format(int(t_sample), util.fmt_time(t_sec)))
+        self.logger.info('Sample {} @ {}, offset {}'.format(int(t_sample), util.fmt_time(t_sec),
+                                                          self.offset))
 
     def on_timer(self, _):
         """Frame update callback."""
@@ -288,6 +300,11 @@ class Vis(app.Canvas):
             self.dirty = False
 
             data = self.buf.get_data(0, self.buffer_length)
+
+            # Apply filter settings
+            if self.apply_filter:
+                data = signal.filtfilt(self.filter[0], self.filter[1], data, axis=1).astype(np.float32)
+
             self.program['a_position'].set_data(data)
 
         if self.running:
@@ -318,6 +335,7 @@ def run(*args, **kwargs):
     parser.add_argument('-C', '--channels', help='Number of channels', type=int)
     parser.add_argument('-l', '--layout', help='Path to probe file defining channel order')
     parser.add_argument('-D', '--dtype', help='Data type if needed (e.g. float32 dat files')
+    parser.add_argument('-J', '--jump', help='Jump to timepoint (in seconds)', type=float, default=0)
 
     cli_args = parser.parse_args(*args)
     if 'layout' in cli_args and cli_args.layout is not None:
@@ -332,7 +350,8 @@ def run(*args, **kwargs):
         n_channels=cli_args.channels,
         channels=channels,
         bad_channels=bad_channels,
-        dtype=cli_args.dtype)
+        dtype=cli_args.dtype,
+        start=cli_args.jump)
     app.run()
 
 
