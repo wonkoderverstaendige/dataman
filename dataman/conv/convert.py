@@ -12,6 +12,7 @@ import tqdm
 import argparse
 from dataman.lib.constants import LOG_LEVEL_VERBOSE
 from pprint import pformat
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +72,12 @@ def continuous_to_dat(target_metadata, output_path, channel_group,
 
     try:
         logger.debug('Opening output file {} in filemode {}'.format(output_path, file_mode + 'b'))
-        with ExitStack() as stack, open(output_path, file_mode + 'b') as out_fid_dat:
+        with ExitStack() as stack,\
+                open(output_path, file_mode + 'b') as out_fid_dat,\
+                open(output_path + '.dman', 'a') as dman_offset_file:
+
             data_duration = 0
+            samples_written = 0
 
             # Loop over all sub-recordings
             for sub_id, subset in target_metadata['SUBSETS'].items():
@@ -131,7 +136,10 @@ def continuous_to_dat(target_metadata, output_path, channel_group,
                     res.transpose().tofile(out_fid_dat)
 
                     records_left -= count
+                    pbar.update(count * 1024)
+                    samples_written += count * 1024
                     bytes_written += (count * 2048 * len(data_channel_ids))
+
                 pbar.close()
 
                 data_duration += bytes_written / (2 * sampling_rate * len(data_channel_ids))
@@ -150,6 +158,9 @@ def continuous_to_dat(target_metadata, output_path, channel_group,
                 logger.removeHandler(file_handler)
                 file_handler.close()
 
+            # Writing segment position data
+            dman_offset_file.write('{}, {}\n'.format(target_metadata['TARGET'], samples_written))
+            print('written!')
             return data_duration
 
     except IOError as e:
@@ -300,6 +311,9 @@ def main(args):
         output_basename = fname_template.format(prefix=out_prefix, cg_id=cg_id, crs=crs)
         output_fname = ''.join([output_basename, out_fext])
         output_file_path = op.join(out_path, output_fname)
+
+        with open(output_file_path + '.dman', 'w') as dman_offset_file:
+            dman_offset_file.write('target_path, num_samples\n')
 
         duration_written = 0
         # First target, file mode is write, after that, append to output file
