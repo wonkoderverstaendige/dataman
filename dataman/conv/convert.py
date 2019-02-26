@@ -34,6 +34,22 @@ DEFAULT_FULL_TEMPLATE = '{prefix}--cg({cg_id:02})_ch[{crs}]'
 DEFAULT_SHORT_TEMPLATE = '{prefix}--cg{cg_id:02}'
 
 
+def expand_sessions(lot):
+    """Check if item in target list is a .session file. If so, read all lines as
+    paths into the target list.
+    """
+    targets = []
+    for t in lot:
+        if t.endswith('.session'):
+            with open(t, 'r') as session_file:
+                session_items = [tp.strip() for tp in session_file.readlines()]
+                logger.info("Expanding session file '{}' with {} targets".format(t, len(session_items)))
+                targets.extend(session_items)
+        else:
+            targets.append(t)
+    return targets
+
+
 def continuous_to_dat(target_metadata, output_path, channel_group,
                       file_mode='w', chunk_records=1000, duration=0,
                       dead_channel_ids=None, zero_dead_channels=True):
@@ -95,7 +111,6 @@ def continuous_to_dat(target_metadata, output_path, channel_group,
                 pbar = tqdm.tqdm(total=records_left * 1024, unit_scale=True, unit='Samples')
                 while records_left:
                     count = min(records_left, chunk_records)
-                    pbar.update(count * 1024)
 
                     logger.log(level=LOG_LEVEL_VERBOSE, msg=DEBUG_STR_CHUNK.format(count=count, left=records_left,
                                                                                    num_records=n_blocks))
@@ -187,7 +202,8 @@ def main(args):
     if cli_args.remove_trailing_zeros:
         raise NotImplementedError("Can't remove trailing zeros just yet.")
 
-    targets = [op.abspath(op.expanduser(t)) for t in cli_args.target]
+    targets = [op.abspath(op.expanduser(t)) for t in expand_sessions(cli_args.target)]
+
     formats = list(set([util.detect_format(target) for target in targets]))
 
     # Input file format

@@ -356,7 +356,6 @@ def metadata_from_target(target_dir, channel_type='CH', *args, **kwargs):
                 'TARGET': str(Path(target_dir).resolve())}
 
     # Grab metadata from the settings.xml file in the base directory
-    print(target_dir)
     xml_md = metadata_from_xml(target_dir)
     metadata.update(xml_md)
 
