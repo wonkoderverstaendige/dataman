@@ -28,8 +28,6 @@ def get_batches(length, batch_size):
 
 def estimate_noise(arr, lc=300, hc=6000, num_channels=4, fs=3e4, uV_factor=0.195):
     ne_binsize = int(fs)  # noise estimation binsize
-    # TODO: Throws a deprecation warning in scipy/signal/_arraytools.py:45: FutureWarning: Using a non-tuple sequence
-    # for multidimensional indexing is deprecated; use `arr[tuple(seq)]` instead of `arr[seq]`.
 
     # Filter
     b, a = butter_bandpass(lc, hc, fs)
@@ -37,7 +35,7 @@ def estimate_noise(arr, lc=300, hc=6000, num_channels=4, fs=3e4, uV_factor=0.195
     ne = np.zeros((len(batches), num_channels))
     nfac = 1 / 0.6745
 
-    for n, batch in enumerate(tqdm(batches, leave=False, desc='estimation')):
+    for n, batch in enumerate(tqdm(batches, leave=False, desc='1) estimating...')):
         n_samples = min(ne_binsize, arr.shape[0] - batch)
         filtered = signal.filtfilt(b, a, arr[batch:batch + n_samples, :].astype(np.double), axis=0) * uV_factor
         for ch in range(num_channels):
@@ -255,7 +253,7 @@ def detect_spikes(arr, thresholds, fs=3e4, chunk_size_s=60, lc=300, hc=6000, s_p
     end = arr.shape[0]
     chunk_starts = [cs * chunk_size for cs in range(ceil(end / chunk_size))]
 
-    for n_chunk, start in enumerate(tqdm(chunk_starts, leave=False, desc='detection')):
+    for n_chunk, start in enumerate(tqdm(chunk_starts, leave=False, desc='2) detecting...')):
         # limits of core batch chunk
         b_start = start
         b_end = min(start + chunk_size, end)
@@ -277,7 +275,7 @@ def detect_spikes(arr, thresholds, fs=3e4, chunk_size_s=60, lc=300, hc=6000, s_p
 
         n_spikes = xr_starts.shape[0]
         if not n_spikes:
-            print('No spikes in chunk')
+            tqdm.write('No spikes in chunk')
             continue
 
         # Extract preliminary waveforms
@@ -288,7 +286,7 @@ def detect_spikes(arr, thresholds, fs=3e4, chunk_size_s=60, lc=300, hc=6000, s_p
         try:
             wv = filtered[idc]
         except IndexError:
-            print('Spikes out of bounds!')
+            tqdm.write('Spikes out of bounds!')
             break
 
         # Alignment
@@ -313,7 +311,7 @@ def detect_spikes(arr, thresholds, fs=3e4, chunk_size_s=60, lc=300, hc=6000, s_p
     tdif = np.diff(timestamps) > reject_overlap
 
     too_close = timestamps.shape[0] - np.sum(tdif)
-    print('{} ({:.1f}%) spikes rejected due to >{} sample overlap'.format(too_close,
+    tqdm.write('{} ({:.1f}%) spikes rejected due to >{} sample overlap'.format(too_close,
                                                                           too_close / timestamps.shape[0] * 100,
                                                                           reject_overlap))
 
@@ -347,13 +345,13 @@ def extract_waveforms(timestamps, arr, outpath, s_pre=8, s_post=24, lc=300, hc=6
         raise FileExistsError('Mat file already exists. Exiting.')
 
     h5s.savemat(str(outpath), {'n': len(timestamps),
-                          'index': np.double((timestamps - s_pre) / 3),
-                          # 'readme': 'Written by python.', 'original_path': str(path)
-                          }, compress=False)
+                               'index': np.double((timestamps - s_pre) / 3),
+                               # 'readme': 'Written by python.', 'original_path': str(path)
+                               }, compress=False)
 
     with h5.File(str(outpath), 'a') as hf:
         hf.create_dataset('spikes', (128, len(timestamps)), maxshape=(128, None), dtype='int16')
-        for n_chunk, start in enumerate(tqdm(chunk_starts, leave=False, desc='Extraction')):
+        for n_chunk, start in enumerate(tqdm(chunk_starts, leave=False, desc='3) extracting...')):
             # limits of core batch chunk
             b_start = start
             b_end = min(start + chunk_size, end)
@@ -378,10 +376,8 @@ def extract_waveforms(timestamps, arr, outpath, s_pre=8, s_post=24, lc=300, hc=6
             try:
                 hf['spikes'][:, min(ts_idc):max(ts_idc) + 1] = filtered[idc].reshape(-1, 128).T
             except IndexError:
-                print('Spikes out of bounds!')
+                tqdm.write('Spikes out of bounds!')
                 break
-
-    print('Done!')
 
 
 def main(args):
@@ -393,25 +389,31 @@ def main(args):
                         help="""Directory with tetrode files.""")
     parser.add_argument('-o', '--out_path', help='Output file path Defaults to current working directory')
     parser.add_argument('--sampling-rate', type=float, help='Sampling rate. Default 30000 Hz', default=3e4)
-    parser.add_argument('-p', '--prefix', help='Input filename template, defaults to "tetrode{:02d}.dat"',
-                        default='tetrode{:02d}.dat')
-    parser.add_argument('-m', '--matfile', help="""Filename for output. For easy further processing, defaults to
-                                                  'tetrode{:02d}.mat'""", default='tetrode{:02d}.mat')
+    parser.add_argument('--noise_percentile', type=int, help='Noise percentile. Default: 5', default=5)
+    parser.add_argument('--threshold', type=float, help='Threshold. Default: 4.5', default=4.5)
+    # parser.add_argument('-p', '--prefix', help='Input filename template, defaults to "tetrode{:02d}.dat"',
+    #                     default='tetrode{:02d}.dat')
+    # parser.add_argument('-m', '--matfile', help="""Filename for output. For easy further processing, defaults to
+    #                                               'tetrode{:02d}.mat'""", default='tetrode{:02d}.mat')
     parser.add_argument('-t', '--tetrodes', nargs='*', help='0-index list of tetrodes to look at. Default: all.')
     parser.add_argument('-f', '--force', action='store_true', help='Force overwrite of existing files.')
     parser.add_argument('--start', type=float, help='Segment start in seconds')
     parser.add_argument('--end', type=float, help='Segment end in seconds')
 
-    # TODO: Argument for stddev_factor
-    stddev_factor = 4.5
-
     cli_args = parser.parse_args(args)
     logger.debug('Arguments: {}'.format(cli_args))
 
+    stddev_factor = cli_args.threshold
+    print('Thresold factor   : ', stddev_factor)
+
     fs = cli_args.sampling_rate
-    noise_percentile = 5
+    print('Sampling rate     : ', fs)
+
+    noise_percentile = cli_args.noise_percentile
+    print('Noise percentile : ', noise_percentile)
+
     target = Path(cli_args.target)
-    tetrodes = range(16) if (cli_args.tetrodes is None or not len(cli_args.tetrodes)) else map(int, cli_args.tetrodes)
+    tetrode_files = sorted(target.glob('tetrode*.dat'))
 
     start = int(cli_args.start * fs) if cli_args.start is not None else None
     end = int(cli_args.end * fs) if cli_args.end is not None else None
@@ -419,35 +421,34 @@ def main(args):
     now = dt.today().strftime('%Y%m%d_%H%M%S')
     report_path = target / f'dataman_detect_report_{now}.html'
 
-    for tetrode in tqdm(list(tetrodes), desc='Progress'):
+    for tt, tetrode_file in tqdm(enumerate(list(tetrode_files)), desc='Progress', total=len(tetrode_files), unit='TT'):
         report_string = ''
 
         # General report on shape, lengths etc.
-        tqdm.write(f'Starting spike detection for tetrode {tetrode}')
-        path = (target / cli_args.prefix.format(tetrode)).resolve()
-        if not path.exists():
-            print(f"{path} not found. Skipping.")
+        tqdm.write(f'Starting spike detection for {tetrode_file.name}')
+        if not tetrode_file.exists():
+            tqdm.write(f"{tetrode_file} not found. Skipping.")
             continue
 
-        matpath = path.parent / cli_args.matfile.format(tetrode)
+        matpath = tetrode_file.with_suffix('.mat')
         if matpath.exists() and not cli_args.force:
-            print(f'{matpath} already exists. Delete or use --force to overwrite.')
+            tqdm.write(f'{matpath} already exists. Delete or use --force to overwrite.')
             raise SystemExit
         elif matpath.exists() and cli_args.force:
-            print(f'{matpath} already exists, deleting it.')
+            tqdm.write(f'{matpath} already exists, deleting it.')
             os.remove(matpath)
 
         if None not in (start, end):
             assert start < end
-            wb = np.memmap(path, dtype='int16').reshape((-1, 4))[start:end]
+            wb = np.memmap(tetrode_file, dtype='int16').reshape((-1, 4))[start:end]
         else:
-            wb = np.memmap(path, dtype='int16').reshape((-1, 4))
+            wb = np.memmap(tetrode_file, dtype='int16').reshape((-1, 4))
 
         report_string += '<h1>Recording</h1>\n'
         report_string += 'Length: {:.2f} Msamples, {:.2f} minutes'.format(wb.shape[0] / 1e6, wb.shape[0] / fs / 60)
 
-        report_string += f'<h1>Tetrode {tetrode}</h1>'
-        report_string += str(path) + '<br>'
+        report_string += f'<h1>Tetrode {tt}</h1>'
+        report_string += str(tetrode_file) + '<br>'
 
         fig = report.plot_raw(wb)
         report_string += report.fig2html(fig) + '<br>'
@@ -463,24 +464,25 @@ def main(args):
 
         # Report noise amplitudes
         report_string += '<h2>Noise estimation</h2>'
-        fig = report.plot_noise(noise, thresholds=noise_perc, tetrode=tetrode)
+        fig = report.plot_noise(noise, thresholds=noise_perc, tetrode=tt)
         report_string += report.fig2html(fig) + '<br>'
         plt.close(fig)
         del fig
 
         thr = noise_perc * stddev_factor
         for ch in range(4):
-            l = '<b>Channel {}:</b>, Threshold: {:.1f}, 5th percentile: {:.1f} uV (min: {:.1f}, max: {:.1f}, std: {:.1f})'
-            report_string += l.format(ch, thr[ch], noise_perc[ch], ne_min[ch], ne_max[ch], ne_std[ch]) + '<br>'
+            info_line = '<b>Channel {}:</b>, Threshold: {:.1f}, 5th percentile: {:.1f} ' \
+                'uV (min: {:.1f}, max: {:.1f}, std: {:.1f})'
+            report_string += info_line.format(ch, thr[ch], noise_perc[ch], ne_min[ch], ne_max[ch], ne_std[ch]) + '<br>'
 
         # Spike Timestamp Detection ##################################################
         report_string += '<h2>Spike Detection</h2>'
 
-        timestamps = detect_spikes(wb, thr, align='min')
+        timestamps = detect_spikes(wb, thr, align='min', fs=fs)
 
         sps = len(timestamps) / (wb.shape[0] / fs)
         report_string += '<b>{} spikes</b> ({:.1f} sps)'.format(len(timestamps), sps)
-        print(f'Tetrode {tetrode}: {len(timestamps)} spikes, {sps:.1f} sps')
+        tqdm.write(f'Tetrode {tt}: {len(timestamps)} spikes, {sps:.1f} sps')
 
         # Spike Waveform Extraction ##################################################
         extract_waveforms(timestamps, wb, outpath=matpath, s_pre=8, s_post=24, fs=fs)
