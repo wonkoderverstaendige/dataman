@@ -22,7 +22,11 @@ class DataStreamer(Streamer.Streamer):
     def __init__(self, target_path, metadata, *args, **kwargs):
         super(DataStreamer, self).__init__(*args, **kwargs)
         self.target_path = target_path
-        self.dtype = np.dtype('int16')
+
+        if 'dtype' in kwargs:
+            self.dtype = kwargs['dtype']
+        else:
+            self.dtype = np.dtype('int16')
         logger.debug('DAT-File Streamer Initialized at {}!'.format(target_path))
         self.cfg = metadata
 
