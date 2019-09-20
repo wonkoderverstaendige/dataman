@@ -1,10 +1,11 @@
 from os import path as op, remove
 from shutil import copyfile
 import numpy as np
-from dataman.lib.util import get_batch_size, run_prb, flat_channel_list, has_prb
+from dataman.lib.util import get_batch_limits, get_batch_size, run_prb, flat_channel_list, has_prb
 from dataman.formats import dat
 import logging
-from tqdm import trange
+from tqdm import trange, tqdm
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -19,15 +20,13 @@ def ref(dat_path, ref_path=None, keep=False, inplace=False, *args, **kwargs):
     assert ref_path
 
     logger.info('Reference subtraction')
-    subtract_reference(dat_path, ref_path, inplace=inplace, *args, **kwargs)
-
-    # Copy the prb file
-    if not inplace:
-        logger.warning('Copying probe file to follow referenced data.')
+    out_path = subtract_reference(dat_path, ref_path, inplace=inplace, *args, **kwargs)
 
     if not keep:
         logger.warning('Not keeping reference file. Deleting it...')
         remove(ref_path)
+
+    return out_path
 
 
 def subtract_reference(dat_path, ref_path, precision='single', inplace=False,
@@ -39,13 +38,13 @@ def subtract_reference(dat_path, ref_path, precision='single', inplace=False,
     logger.debug('Subtracting {} from {}'.format(ref_path, dat_path))
     logger.debug('Precision: {}, inplace={} with {} channels'.format(precision, inplace, n_channels))
     logger.debug('Opening files, dat: {}; ref: {}'.format(dat_path, ref_path))
-    with open(dat_path, 'r+b') as dat_file, open(ref_path, 'rb') as mu:
+    with open(dat_path, 'r+b') as dat_file, open(ref_path, 'r+b') as ref_file:
         dat_arr = np.memmap(dat_file, dtype='int16').reshape(-1, n_channels)
-        mu_arr = np.fromfile(mu, dtype=precision).reshape(-1, 1)
-        assert (dat_arr.shape[0] == mu_arr.shape[0])
+        ref_arr = np.memmap(ref_file, dtype=precision).reshape(-1, 1)
+        assert (dat_arr.shape[0] == ref_arr.shape[0])
 
-    batch_size, n_batches, batch_size_last = get_batch_size(dat_arr)
     fname, ext = op.splitext(dat_path)
+    out_path = fname + '_meanref' + ext
 
     logger.debug('Bad channels: {}, zeroing: {}'.format(ch_idx_bad, zero_bad_channels))
 
@@ -53,59 +52,66 @@ def subtract_reference(dat_path, ref_path, precision='single', inplace=False,
         if inplace:
             out_arr = dat_arr
         else:
-            out_arr = np.memmap(fname + '_meanref' + ext, mode='w+', dtype=dat_arr.dtype, shape=dat_arr.shape)
+            out_arr = np.memmap(out_path, mode='w+', dtype=dat_arr.dtype, shape=dat_arr.shape)
 
-        for bn in trange(n_batches + 1):
-            bs = batch_size if bn < n_batches else batch_size_last
+        batches = get_batch_limits(dat_arr.shape[0], get_batch_size(dat_arr))
+
+        for start, end in tqdm(batches):
+            logger.debug(str((start, end)))
             if inplace:
-                out_arr[bn * bs:(bn + 1) * bs, :] -= mu_arr[bn * bs:(bn + 1) * bs].astype(out_arr.dtype)
+                out_arr[start:end, :] -= ref_arr[start:end].astype(out_arr.dtype)
             else:
-                out_arr[bn * bs:(bn + 1) * bs, :] = dat_arr[bn * bs:(bn + 1) * bs, :] - mu_arr[bn * bs:(bn + 1) * bs]
+                out_arr[start:end, :] = dat_arr[start:end, :] - ref_arr[start:end]
 
             if zero_bad_channels and ch_idx_bad is not None:
-                out_arr[bn * bs:(bn + 1) * bs, ch_idx_bad] = 0
+                logger.info('Zeroing channels {}'.format(ch_idx_bad))
+                out_arr[start:end, ch_idx_bad] = 0
 
     except BaseException as e:
         print(e)
+    else:
+        return out_path
 
 
-def make_ref_file(dat_path, n_channels, ref_out_fname=None, *args, **kwargs):
-    # calculate mean over given array.
+def make_ref_file(dat_path, n_channels, ref_out_fname=None, precision='float32',
+                  ch_idx_good=None, ch_idx_bad=None, *args, **kwargs):
+    """Create reference file, that is a file of the mean of all good channels of a .dat file."""
     if ref_out_fname is None:
         fname, ext = op.splitext(dat_path)
         ref_out_fname = fname + '_reference' + ext
 
-    with open(dat_path, 'rb') as dat_file, open(ref_out_fname, 'wb+') as mu:
+    with open(dat_path, 'rb') as dat_file, open(ref_out_fname, 'wb+') as ref_file:
         dat_arr = np.memmap(dat_file, mode='r', dtype='int16').reshape(-1, n_channels)
-        _batch_reference(dat_arr, mu, *args, **kwargs)
+
+        assert not (ch_idx_good is not None and ch_idx_bad is not None)
+        if ch_idx_bad is not None:
+            ch_idx_good = [c for c in range(dat_arr.shape[1]) if c not in ch_idx_bad]
+        if ch_idx_good is not None:
+            n_channels = len(ch_idx_good)
+        else:
+            n_channels = dat_arr.shape[1]
+
+        all_good = set(range(n_channels)) == set(ch_idx_good)
+
+        logger.debug(
+            'Reference will be created at {} from {} channels'.format(ref_file.name, n_channels))
+        if all_good:
+            logger.debug('All channels good, will calculate mean over all channels.')
+
+        batches = get_batch_limits(dat_arr.shape[0], get_batch_size(dat_arr))
+        for start, end in tqdm(batches):
+            logger.debug(str((start, end)))
+            if ch_idx_good is None or all_good:
+                batch = dat_arr[start:end, :]
+            else:
+                batch = dat_arr[start:end, :].take(ch_idx_good, axis=1)
+            mean = np.mean(batch, axis=1, dtype=precision)
+            mean.tofile(ref_file)
+
     return ref_out_fname
 
 
-def _batch_reference(arr_like, out_file, ch_idx_good=None, ch_idx_bad=None, precision='float32', *args, **kwargs):
-    # out_file is file pointer!
-    batch_size, n_batches, batch_size_last = get_batch_size(arr_like)
-    assert not (ch_idx_good is not None and ch_idx_bad is not None)
-    if ch_idx_bad is not None:
-        ch_idx_good = [c for c in range(arr_like.shape[1]) if c not in ch_idx_bad]
-    if ch_idx_good is not None:
-        n_channels = len(ch_idx_good)
-    else:
-        n_channels = arr_like.shape[1]
-
-    logger.debug(
-        'Reference will to be created at {} from {} channels'.format(out_file.name, n_channels))
-
-    for bn in trange(n_batches + 1):
-        bs = batch_size if bn < n_batches else batch_size_last
-        if ch_idx_good is None:
-            batch = arr_like[bn * bs:(bn + 1) * bs, :]
-        else:
-            batch = arr_like[bn * bs:(bn + 1) * bs, :].take(ch_idx_good, axis=1)
-        np.mean(batch, axis=1, dtype=precision).tofile(out_file)
-
-
 def copy_as(src, dst):
-    logger.info('Copying file {} to {}.'.format(src, dst))
     copyfile(src, dst)
 
 
@@ -126,6 +132,7 @@ def main(args):
     parser.add_argument('-k', '--keep', action='store_true', help='Keep intermediate reference file')
     cli_args = parser.parse_args(args)
 
+    # get number of channels in data, either from the cli args or data set config
     n_channels = cli_args.channels if 'channels' in cli_args else None
     cfg = dat.metadata_from_target(cli_args.input, n_channels=n_channels)
     if n_channels is None:
@@ -143,20 +150,31 @@ def main(args):
         layout = run_prb(probe_file)
 
         channels, bad_channels = flat_channel_list(layout)[:n_channels]
-        print(bad_channels)
     else:
         channels = None
         bad_channels = None
 
     logger.debug('Good: {}, bad: {}'.format(channels, bad_channels))
 
-    ref(cli_args.input,
-        ref_path=cli_args.reference,
-        out_dir=cli_args.out,
-        n_channels=n_channels,
-        ch_idx_good=cli_args.good_channels,
-        ch_idx_bad=bad_channels,
-        zero_bad_channels=cli_args.zero_bad_channels,
-        make_only=cli_args.make_only,
-        inplace=cli_args.inplace,
-        keep=cli_args.keep)
+    if cli_args.make_only:
+        raise NotImplemented
+
+    rv = ref(cli_args.input,
+             ref_path=cli_args.reference,
+             out_dir=cli_args.out,
+             n_channels=n_channels,
+             ch_idx_good=cli_args.good_channels,
+             ch_idx_bad=bad_channels,
+             zero_bad_channels=cli_args.zero_bad_channels,
+             make_only=cli_args.make_only,
+             inplace=cli_args.inplace,
+             keep=cli_args.keep)
+    if not rv:
+        raise RuntimeError('Failed to create reference! Rv: {}'.format(rv))
+    else:
+        reffed_path = Path(rv)
+
+    # Copy the prb file
+    if not cli_args.inplace:
+        logger.warning('Copying probe file to follow referenced data.')
+        copy_as(probe_file, reffed_path.with_suffix('.prb'))

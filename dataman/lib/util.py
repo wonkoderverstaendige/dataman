@@ -24,19 +24,19 @@ def butter_bandpass(lowcut, highcut, fs, order=5):
 
 
 def get_batch_size(arr, ram_limit=DEFAULT_MEMORY_LIMIT_MB):
-    """Return batch size, number of full batches and remainder size for 2D array."""
-
+    """Get batch size for an array given memory limit per batch"""
     batch_size = int(ram_limit * 1e6 / arr.shape[1] / arr.dtype.itemsize)
-    n_batches = arr.shape[0] // batch_size
-    remainder = arr.shape[0] % batch_size
-    return batch_size, n_batches, remainder
+    return batch_size
 
 
-def get_batches(length, batch_size):
-    batches = [bc * batch_size for bc in range(length // batch_size)]
-    if length - (length // batch_size) * batch_size:
-        batches.append(length - length % batch_size)
-    return batches
+def get_batch_limits(length, batch_size):
+    starts = [bc * batch_size for bc in range(length // batch_size)]
+    ends = [start + batch_size for start in starts[:-1]]
+    ends.append(length)
+    # if length - (length // batch_size) * batch_size:
+    #     batches.append(length - length % batch_size)
+    # return batches
+    return list(zip(starts, ends))
 
 
 def detect_format(path, return_singlular=True):
