@@ -35,7 +35,7 @@ def estimate_noise(arr, lc=300, hc=6000, num_channels=4, fs=3e4, uV_factor=0.195
     ne = np.zeros((len(batches), num_channels))
     nfac = 1 / 0.6745
 
-    for n, batch in enumerate(tqdm(batches, leave=False, desc='1) estimating...')):
+    for n, batch in enumerate(tqdm(batches, leave=False, desc='1) estimating')):
         n_samples = min(ne_binsize, arr.shape[0] - batch)
         filtered = signal.filtfilt(b, a, arr[batch:batch + n_samples, :].astype(np.double), axis=0) * uV_factor
         for ch in range(num_channels):
@@ -253,7 +253,7 @@ def detect_spikes(arr, thresholds, fs=3e4, chunk_size_s=60, lc=300, hc=6000, s_p
     end = arr.shape[0]
     chunk_starts = [cs * chunk_size for cs in range(ceil(end / chunk_size))]
 
-    for n_chunk, start in enumerate(tqdm(chunk_starts, leave=False, desc='2) detecting...')):
+    for n_chunk, start in enumerate(tqdm(chunk_starts, leave=False, desc='2) detecting')):
         # limits of core batch chunk
         b_start = start
         b_end = min(start + chunk_size, end)
@@ -351,7 +351,7 @@ def extract_waveforms(timestamps, arr, outpath, s_pre=8, s_post=24, lc=300, hc=6
 
     with h5.File(str(outpath), 'a') as hf:
         hf.create_dataset('spikes', (128, len(timestamps)), maxshape=(128, None), dtype='int16')
-        for n_chunk, start in enumerate(tqdm(chunk_starts, leave=False, desc='3) extracting...')):
+        for n_chunk, start in enumerate(tqdm(chunk_starts, leave=False, desc='3) extracting')):
             # limits of core batch chunk
             b_start = start
             b_end = min(start + chunk_size, end)
@@ -425,7 +425,7 @@ def main(args):
         report_string = ''
 
         # General report on shape, lengths etc.
-        tqdm.write(f'Starting spike detection for {tetrode_file.name}')
+        tqdm.write(f'-> Starting spike detection for {tetrode_file.name}')
         if not tetrode_file.exists():
             tqdm.write(f"{tetrode_file} not found. Skipping.")
             continue
