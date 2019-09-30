@@ -27,7 +27,7 @@ BUFFER_LENGTH = int(3e4)
 
 
 class Vis(app.Canvas):
-    def __init__(self, target_path, n_cols=1, channels=None, start=0, *args, **kwargs):
+    def __init__(self, target_path, n_cols=1, channels=None, start=0, dtype='int16', *args, **kwargs):
         app.Canvas.__init__(self, title=target_path, keys='interactive', size=(1900, 1000),
                             position=(0, 0), app='pyqt5')
         self.logger = logging.getLogger(__name__)
@@ -45,6 +45,7 @@ class Vis(app.Canvas):
         if 'HEADER' in self.metadata:
             self.logger.debug('Using legacy .dat file metadata dictionary layout')
             self.fs = self.metadata['HEADER']['sampling_rate']
+            self.input_dtype = self.metadata['DTYPE']
             self.n_samples_total = int(self.metadata['HEADER']['n_samples'])
             self.n_channels = self.metadata['CHANNELS']['n_channels']
             self.block_size = self.metadata['HEADER']['block_size']
@@ -62,7 +63,10 @@ class Vis(app.Canvas):
             raise ValueError('Unknown metadata format from target.')
 
         self.logger.debug(
-            'From target: {:.2f} Hz, {} channels, {} samples'.format(self.fs, self.n_channels, self.n_samples_total))
+            'From target: {:.2f} Hz, {} channels, {} samples, dtype={}'.format(self.fs,
+                                                                               self.n_channels,
+                                                                               self.n_samples_total,
+                                                                               self.input_dtype))
         self.channel_order = channels  # if None: no particular order
 
         # 300-6000 Hz Highpass filter
@@ -288,7 +292,7 @@ class Vis(app.Canvas):
         t_sample = (t_r * self.buffer_length + self.offset * 1024)  # self.cfg['HEADER']['block_size']
         t_sec = t_sample / self.fs
         self.logger.info('Sample {} @ {}, offset {}'.format(int(t_sample), util.fmt_time(t_sec),
-                                                          self.offset))
+                                                            self.offset))
 
     def on_timer(self, _):
         """Frame update callback."""
