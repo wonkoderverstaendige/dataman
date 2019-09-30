@@ -105,7 +105,7 @@ def flat_channel_list(prb):
     """
 
     channels = sum([prb['channel_groups'][cg]['channels'] for cg in sorted(prb['channel_groups'])], [])
-    dead_channels = prb['dead_channels']
+    dead_channels = prb['dead_channels'] if 'dead_channels' in prb else []
 
     return channels, dead_channels
 
