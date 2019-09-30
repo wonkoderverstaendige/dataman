@@ -366,3 +366,8 @@ def main(args):
         #                                 n_channels=len(channel_group['channels'])))
 
         logger.debug('Done! Total data length written: {}'.format(util.fmt_time(total_duration_written)))
+
+
+if __name__ == '__main__':
+    import sys
+    main(sys.argv[1:])
