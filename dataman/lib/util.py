@@ -30,7 +30,7 @@ def get_batch_size(arr, ram_limit=DEFAULT_MEMORY_LIMIT_MB):
 
 
 def get_batch_limits(length, batch_size):
-    starts = [bc * batch_size for bc in range(length // batch_size)]
+    starts = [bc * batch_size for bc in range(length // batch_size + 1)]
     ends = [start + batch_size for start in starts[:-1]]
     ends.append(length)
     # if length - (length // batch_size) * batch_size:
