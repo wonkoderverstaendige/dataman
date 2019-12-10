@@ -39,6 +39,8 @@ class Vis(app.Canvas):
         self.logger.debug('Target module: {}'.format(self.format))
         assert self.format is not None
 
+        self.input_dtype = dtype
+
         self.metadata = self._get_target_config(*args, **kwargs)
 
         # TODO: Have .dat format join in on the new format fun...
