@@ -331,21 +331,23 @@ def main(args):
                     dead_channel_ids=dead_channels,
                     zero_dead_channels=cli_args.zero_dead_channels,
                     file_mode='a' if file_mode else 'w',
-                    duration=duration)
+                    duration=duration,
+                    chunk_records=5)
             total_duration_written += duration_written
 
         # create the per-group .prb files
         # FIXME: Dead channels are big mess
-        with open(op.join(out_path, output_basename + '.prb'), 'w') as prb_out:
-            if cli_args.split_groups or (layout is None):
-                # One prb file per channel group
-                ch_out = channel_group['channels']
-                cg_out = {0: {'channels': list(range(len(ch_out)))}}
-                dead_channels = sorted([ch_out.index(dc) for dc in dead_channels if dc in ch_out])
+        if cli_args.split_groups or (layout is None):
+            # One prb file per channel group
+            ch_out = channel_group['channels']
+            cg_out = {0: {'channels': list(range(len(ch_out)))}}
+            dead_channels = sorted([ch_out.index(dc) for dc in dead_channels if dc in ch_out])
 
-            else:
-                # Same channel groups, but with flat numbering
-                cg_out, dead_channels = util.monotonic_prb(layout)
+        else:
+            # Same channel groups, but with flat numbering
+            cg_out, dead_channels = util.monotonic_prb(layout)
+
+        with open(op.join(out_path, output_basename + '.prb'), 'w') as prb_out:
             prb_out.write('dead_channels = {}\n'.format(pprint.pformat(dead_channels)))
             prb_out.write('channel_groups = {}'.format(pprint.pformat(cg_out)))
 
