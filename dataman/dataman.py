@@ -166,6 +166,10 @@ def main():
     logger.log(level=LOG_LEVEL_VERBOSE, msg='CLI_ARGS: {}'.format(cli_args))
     logger.log(level=LOG_LEVEL_VERBOSE, msg='CMD_ARGS: {}'.format(cmd_args))
 
+    # disable font_manager spamming the debug log
+    logging.getLogger('matplotlib').disabled = True
+    logging.getLogger('matplotlib.fontmanager').disabled = True
+
     # start cli
     if cli_args.command in [None, 'cli']:
         logger.debug('Starting CLI via command: {}'.format(cli_args.command))
