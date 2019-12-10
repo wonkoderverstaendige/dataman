@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
-import re
-import os.path as op
-from termcolor import colored
 import logging
+import os
+import os.path as op
+import pprint
+import re
 from collections import Counter
+
+from scipy import signal
+from termcolor import colored
+
 from dataman.formats import get_valid_formats
 from dataman.lib.constants import DEFAULT_MEMORY_LIMIT_MB
-from scipy import signal
 
 ansi_escape = re.compile(r'\x1b[^m]*m')
 logger = logging.getLogger(__name__)
@@ -92,6 +95,15 @@ def run_prb(path):
     exec(layout, {}, metadata)
     metadata = {k.lower(): v for (k, v) in metadata.items()}
     return metadata
+
+
+def write_prb(prb_path, channel_groups, dead_channels=None):
+    """Write a .prb file with given channel group dictionary and list of dead channels
+    """
+    dead_channels = [] if dead_channels is None else dead_channels
+    with open(prb_path, 'w') as prb_file:
+        prb_file.write('dead_channels = {}\n'.format(pprint.pformat(dead_channels)))
+        prb_file.write('channel_groups = {}\n'.format(pprint.pformat(channel_groups)))
 
 
 def flat_channel_list(prb):

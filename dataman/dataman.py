@@ -100,6 +100,11 @@ class DataMan(cmd.Cmd):
         detect.main(args_string.split(' '))
 
     @staticmethod
+    def do_features(args_string):
+        from dataman.features import features
+        features.main(args_string.split(' '))
+
+    @staticmethod
     def do_check(args_string):
         pass
 
