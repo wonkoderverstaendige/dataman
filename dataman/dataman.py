@@ -13,7 +13,7 @@ from dataman.lib.constants import LOG_LEVEL_VERBOSE
 LOG_LEVEL_DEFAULT = logging.INFO
 LOG_LEVEL_DEBUG = logging.DEBUG
 
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 
 current_path = os.getcwd()
 try:
