@@ -305,24 +305,34 @@ def get_needed_channels(cli_args=None):
         print(' '.join(map(str, channels)))
 
 
-def fmt_time(s, minimal=True):
+def fmt_time(s, minimal=True, millis=True, delim=' '):
     """
     Args:
         s: time in seconds (float for fractional)
         minimal: Flag, if true, only return strings for times > 0, leave rest outs
     Returns: String formatted 99h 59min 59.9s, where elements < 1 are left out optionally.
     """
+    sec_fmt = '{s:02.3f}s' if millis else '{s:02.0f}s'
+    minutes_fmt = '{m:02d}min'
+    hours_fmt = '{h:02d}h '
+
     ms = s-int(s)
     s = int(s)
+    s_str = sec_fmt.format(s=s+ms)
     if s < 60 and minimal:
-        return "{s:02.3f}s".format(s=s+ms)
+        return s_str
 
     m, s = divmod(s, 60)
+    s_str = sec_fmt.format(s=s + ms)
+    m_str = minutes_fmt.format(m=m)
     if m < 60 and minimal:
-        return "{m:02d}min {s:02.3f}s".format(m=m, s=s+ms)
+        return delim.join([m_str, s_str])
 
     h, m = divmod(m, 60)
-    return "{h:02d}h {m:02d}min {s:02.3f}s".format(h=h, m=m, s=s+ms)
+    m_str = minutes_fmt.format(m=m)
+    h_str = hours_fmt.format(h=h)
+    return delim.join([h_str, m_str, s_str])
+    # return " {m:02d}min {s:02.3f}s".format(h=h, m=m, s=s+ms)
 
 
 def fext(fname):
