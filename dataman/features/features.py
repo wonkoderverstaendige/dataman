@@ -208,7 +208,11 @@ def main(args):
     cli_args = parser.parse_args(args)
 
     matpath = Path(cli_args.target).resolve()
-    matfiles = sorted(list(map(Path.resolve, matpath.glob('tetrode??.mat'))))
+    if matpath.is_file():
+        matfiles = [matpath]
+    else:
+        matfiles = sorted(list(map(Path.resolve, matpath.glob('tetrode??.mat'))))
+
     logger.debug([mf.name for mf in matfiles])
     logger.info('Found {} waveform files'.format(len(matfiles)))
 
