@@ -115,11 +115,22 @@ def feature_chwPCA(wv, dims=3, energy_normalize=True):
     pca_scores = []
     for d in range(4):
         pca = PCA(n_components=dims)
-        data = wv[:, d, :].T.copy()
-        data -= np.mean(data, axis=0)
+        data = wv[:, d, :].T.astype('float64').copy()
+        # data_s = data - np.mean(data, axis=0)  # this messes things up?!
         if energy_normalize:
-            l2 = feature_energy(wv)
-            data = data / np.expand_dims(l2[:, d], axis=1)
+            l2 = feature_energy(data.T)[:, np.newaxis]
+
+            # With dead channels we end up with zero-energy waveforms sometimes, resulting in division by zero.
+            zero_energy_waveforms = (l2 == 0).nonzero()
+            if zero_energy_waveforms[0].shape[0]:
+                logger.warning(
+                    'Found {} instances of zero-energy waveforms in channel {}. Settings those to l2=1.0'.format(
+                        zero_energy_waveforms[0].shape[0], d))
+                l2[zero_energy_waveforms] = 1.0
+
+            # normalize all waveforms by their l2 norm/energy
+            data /= l2
+
         pca_scores.append(pca.fit_transform(data))
         pcas.append(pca)
     pca_scores = np.concatenate(pca_scores, axis=1)
