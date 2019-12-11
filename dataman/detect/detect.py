@@ -1,21 +1,25 @@
-import os
-import numpy as np
 import argparse
 import logging
-from math import ceil
-from scipy import signal, interpolate
-from tqdm import tqdm
-from pathlib import Path
+import os
 from datetime import datetime as dt
-import matplotlib.pyplot as plt
+from pathlib import Path
 
 import h5py as h5
 import hdf5storage as h5s
+import matplotlib.pyplot as plt
+import numpy as np
+from math import ceil
+from scipy import signal
+from tqdm import tqdm
 
 from dataman.detect import report
 from dataman.lib.util import butter_bandpass
 
 logger = logging.getLogger(__name__)
+
+# disable font_manager spamming the debug log
+logging.getLogger('matplotlib').disabled = True
+logging.getLogger('matplotlib.fontmanager').disabled = True
 
 
 def get_batches(length, batch_size):
@@ -23,6 +27,7 @@ def get_batches(length, batch_size):
     if length - (length // batch_size) * batch_size:
         batches.append(length - length % batch_size)
     return batches
+
 
 
 def estimate_noise(arr, lc=300, hc=6000, num_channels=4, fs=3e4, uV_factor=0.195):
@@ -215,6 +220,7 @@ def wv_alignment(w, method='centroid', kernel_width=11, interp_f=None):
 #
 #     return waveforms, timestamps
 
+
 def detect_spikes(arr, thresholds, fs=3e4, chunk_size_s=60, lc=300, hc=6000, s_pre=10, s_post=22,
                   reject_overlap=16, align='centroid'):
     # TODO: Interpolation
@@ -375,11 +381,12 @@ def extract_waveforms(timestamps, arr, outpath, s_pre=8, s_post=24, lc=300, hc=6
             idc = bc_samples + peaks
 
             try:
-                hf['spikes'][:, min(ts_idc):max(ts_idc) + 1] = filtered[idc].reshape(-1, 128).Ts
+                hf['spikes'][:, min(ts_idc):max(ts_idc) + 1] = filtered[idc].reshape(-1, 128).T
             except IndexError:
                 logger.error('Spikes out of bounds!')
                 break
-
+        waveforms = np.array(hf['spikes'], dtype='int16').reshape(s_pre+s_post, n_channels, -1)
+    return waveforms
 
 def main(args):
     parser = argparse.ArgumentParser('Detect spikes in .dat files')
@@ -395,7 +402,7 @@ def main(args):
     parser.add_argument('-t', '--tetrodes', nargs='*', help='0-index list of tetrodes to look at. Default: all.')
     parser.add_argument('-f', '--force', action='store_true', help='Force overwrite of existing files.')
     parser.add_argument('-a', '--align', help='Alignment method, default: min', default='min')
-    parser.add_argument('--start', type=float, help='Segment start in seconds')
+    parser.add_argument('--start', type=float, help='Segment start in seconds', default=0)
     parser.add_argument('--end', type=float, help='Segment end in seconds')
 
     cli_args = parser.parse_args(args)
@@ -416,8 +423,8 @@ def main(args):
     target = Path(cli_args.target)
     tetrode_files = sorted(target.glob('tetrode*.dat'))
 
-    start = int(cli_args.start * fs) if cli_args.start is not None else None
-    end = int(cli_args.end * fs) if cli_args.end is not None else None
+    start = int(cli_args.start * fs) if cli_args.start is not None else 0
+    end = int(cli_args.end * fs) if cli_args.end is not None else -1
 
     now = dt.today().strftime('%Y%m%d_%H%M%S')
     report_path = target / f'dataman_detect_report_{now}.html'
@@ -439,11 +446,10 @@ def main(args):
             logger.warning(f'{matpath} already exists, deleting it.')
             os.remove(matpath)
 
-        if None not in (start, end):
-            assert start < end
-            wb = np.memmap(tetrode_file, dtype='int16').reshape((-1, 4))[start:end]
-        else:
-            wb = np.memmap(tetrode_file, dtype='int16').reshape((-1, 4))
+        raw_memmap = np.memmap(tetrode_file, dtype='int16')
+        logger.debug(f'loading {start}:{end} from memmap {raw_memmap}')
+        wb = raw_memmap.reshape((-1, 4))[start:end]
+        del raw_memmap
 
         logger.debug('Creating waveform figure...')
         report_string += '<h1>Recording</h1>\n'
@@ -484,14 +490,22 @@ def main(args):
         timestamps = detect_spikes(wb, thr, align=cli_args.align, fs=fs)
 
         sps = len(timestamps) / (wb.shape[0] / fs)
-        report_string += '<b>{} spikes</b> ({:.1f} sps)'.format(len(timestamps), sps)
+        report_string += '<b>{} spikes</b> ({:.1f} sps) </br>'.format(len(timestamps), sps)
         logger.info(f'{tetrode_file.name}: {len(timestamps)} spikes, {sps:.1f} sps')
 
         # Spike Waveform Extraction ##################################################
-        extract_waveforms(timestamps, wb, outpath=matpath, s_pre=8, s_post=24, fs=fs)
+        waveforms = extract_waveforms(timestamps, wb, outpath=matpath, s_pre=8, s_post=24, fs=fs)
+
+        # Create waveform plots
+        logger.debug('Creating waveform plots')
+        density_agg = 'log'
+        images = report.ds_shade_waveforms(waveforms, how=density_agg)
+        fig = report.plot_shades(images, density_agg)
+        report_string += report.fig2html(fig) + '</br>'
+        del fig
 
         # Tetrode Done!
-        report_string += '<hr>'
+        report_string += '</hr>'
 
         with open(report_path, 'a') as rf:
             rf.write(report_string)
