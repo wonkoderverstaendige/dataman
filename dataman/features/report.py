@@ -1,31 +1,69 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+
 plt.rcParams['figure.figsize'] = 15, 8
 
-def plot_feature(noise_arr, thresholds, tetrode=None):
-    fig, ax = plt.subplots(4, 1, figsize=(18, 6), sharex=True)
-    #     fig = plt.figure()
-    #     ax = []
-    #     ax[0] = plt.subplot2grid((8, 4), (0, 0))
-    #     ax2 = plt.subplot2grid((8, 4), (0, 1), colspan=2)
-    #     ax3 = plt.subplot2grid((8, 4), (1, 0), colspan=2, rowspan=2)
-    #     ax4 = plt.subplot2grid((8, 4), (1, 2), rowspan=2)
 
-    title = 'Noise estimation (1.0 second bins) ' + ('' if tetrode is None else f'tetrode {tetrode}')
-    ax[0].set_title(title)
+# def plot_waveforms_grid(wv, n_rows=10, n_cols=20, n_overlay=10000):
+#     n_overlay = min(n_overlay, wv.shape[2])
+#
+#     target_wv = wv[:, :, np.linspace(0, wv.shape[2] - 1, n_rows * n_cols, dtype='int64')]
+#     max_amplitude = target_wv.max(axis=(0, 1, 2))
+#     min_amplitude = target_wv.min(axis=(0, 1, 2))
+#
+#     fig = plt.figure(figsize=(28, 10))
+#
+#     # gridspec inside gridspec
+#     outer_grid = gridspec.GridSpec(1, 2, wspace=0.0, hspace=0.0, width_ratios=[20, 8])
+#     inner_grid = gridspec.GridSpecFromSubplotSpec(n_rows, n_cols, subplot_spec=outer_grid[0], wspace=0.0, hspace=0.0)
+#
+#     # waveform plots
+#     for nr in range(n_rows):
+#         for nc in range(n_cols):
+#             n = nc + nr * n_cols
+#             ax = plt.Subplot(fig, inner_grid[n])
+#             ax.axis('off')
+#             ax.plot(target_wv[:, :, n], linewidth=1)
+#             ax.set_ylim(min_amplitude, max_amplitude)
+#             fig.add_subplot(ax)
+#
+#     target_wv = wv[:, :, np.linspace(0, wv.shape[2] - 1, n_overlay, dtype='int64')]
+#     ch_grid = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=outer_grid[1], wspace=0.0, hspace=0.0)
+#     for nr in range(2):
+#         for nc in range(2):
+#             n = nc + nr * 2
+#             ax = plt.Subplot(fig, ch_grid[n])
+#             ax.plot(target_wv[:, n, :], linewidth=1, c=f'C{n}', alpha=.02)
+#             ax.axis('off')
+#             ax.set_ylim(min_amplitude, max_amplitude)
+#             fig.add_subplot(ax)
+#
+#     return fig
 
-    t = np.linspace(0, len(noise_arr), len(noise_arr))
-    limits = np.min(np.percentile(noise_arr, 0, axis=0)), np.max(np.percentile(noise_arr, 99, axis=0))
 
-    for n in range(4):
-        ax[n].plot(t, noise_arr[:, n], color='C' + str(n))
-        ax[n].set_ylabel('$\mu V$')
-        ax[n].set_ylim(limits)
+def plot_feature(feature, feature_name='', timestamps=None):
+    num_features = feature.shape[1]
+    if num_features > 16:
+        raise ValueError("More than 16 features found, indicating wrong array shape.")
 
-        # draw thresholds
-        ax[n].axhline(thresholds[n], linestyle=':', color='gray')
+    fig, ax = plt.subplots(2, num_features, figsize=(16, 6))
+    yq_l, yq_h = np.quantile(feature[:, 0], .1), np.quantile(feature[:, 0], .9)
 
-    ax[-1].set_xlabel('$Seconds$')
+    for n, num_fet in enumerate(range(0, num_features)):
+        lim_l, lim_h = np.quantile(feature[:, num_fet], .1), np.quantile(feature[:, num_fet], .9)
+        if n:
+            ax[0, n].scatter(feature[:, 0], feature[:, num_fet], s=.2, alpha=.1)
+            ax[0, n].set_title('{fn}:{n} / {fn}:0'.format(fn=feature_name, n=num_fet))
+            ax[0, n].set_xlim(yq_l, yq_h)
+            ax[0, n].set_ylim(lim_l, lim_h)
+        else:
+            # TODO: PLOT EVENTS PER SECOND
+            ax[0, n].plot(timestamps)
+
+        ax[1, n].scatter(timestamps, feature[:, num_fet], s=.2, alpha=.1)
+        ax[1, n].set_ylim(lim_l, lim_h)
+
     return fig
 
 

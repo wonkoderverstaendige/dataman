@@ -12,6 +12,7 @@ from math import ceil
 from scipy import signal
 from tqdm import tqdm
 
+import dataman.lib.report
 from dataman.detect import report
 from dataman.lib.util import butter_bandpass
 
@@ -466,6 +467,7 @@ def main(args):
         logger.debug('Creating noise estimation figure...')
         # Noise estimation for threshold calculation  ################################
         noise = estimate_noise(wb)
+
         noise_perc = np.percentile(noise, noise_percentile, axis=0)
         ne_min = np.min(noise, axis=0)
         ne_max = np.max(noise, axis=0)
@@ -499,8 +501,8 @@ def main(args):
         # Create waveform plots
         logger.debug('Creating waveform plots')
         density_agg = 'log'
-        images = report.ds_shade_waveforms(waveforms, how=density_agg)
-        fig = report.plot_shades(images, density_agg)
+        images = dataman.lib.report.ds_shade_waveforms(waveforms, how=density_agg)
+        fig = dataman.lib.report.ds_plot_waveforms(images, density_agg)
         report_string += report.fig2html(fig) + '</br>'
         del fig
 

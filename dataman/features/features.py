@@ -1,17 +1,17 @@
 import argparse
 import logging
+import time
+from itertools import combinations
 from pathlib import Path
 
-import time
 import h5py
 import hdf5storage as h5s
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import numpy as np
+import pandas as pd
 from sklearn.decomposition import PCA
 from tqdm.auto import tqdm
 
-from dataman.lib.report import fig2html
+from dataman.lib.report import fig2html, ds_shade_waveforms, ds_plot_waveforms, ds_shade_feature, ds_plot_features
 from dataman.lib.util import run_prb
 
 PRECISION = np.dtype(np.single)
@@ -49,6 +49,13 @@ def feature_energy(wv):
     """Calculate l2 (euclidean) norm for vector containing spike waveforms
     """
     return np.sqrt(np.sum(wv ** 2, axis=0)).T
+
+
+def feature_weighted_energy(wv, dropoff=.1, s_pre=8, s_post=16):
+    """Calculate l2 (euclidean) norm for vectors of spike waveform, where
+    waveform amplitudes are weighted towards the peak/detection center at dropoff rate"""
+    kernel = np.ones(s_pre + s_post)
+    raise NotImplemented('This feature has not been implemented yet.')
 
 
 def feature_position(pos_file, dat_offsets, timestamps, indices, sampling_rate=3e4):
@@ -90,6 +97,7 @@ def feature_position(pos_file, dat_offsets, timestamps, indices, sampling_rate=3
 
 
 def feature_cPCA(wv, n_components=12, incremental=False, batch_size=None):
+    """Concatenated PCA. Uses concatenated channels."""
     if incremental:
         raise NotImplementedError("Can't run incremental PCA yet.")
 
@@ -99,8 +107,8 @@ def feature_cPCA(wv, n_components=12, incremental=False, batch_size=None):
     return scores
 
 
-def feature_chwPCA(wv, dims=3, energy_normalize=False):
-    """
+def feature_chwPCA(wv, dims=3, energy_normalize=True):
+    """ Channel wise (normalized) PCA
     waveforms shape is (nSamples x nChannels x nSpikes)
     """
     pcas = []
@@ -118,80 +126,29 @@ def feature_chwPCA(wv, dims=3, energy_normalize=False):
     return pca_scores
 
 
-def plot_waveforms_grid(wv, n_rows=10, n_cols=20, n_overlay=10000):
-    n_overlay = min(n_overlay, wv.shape[2])
-
-    target_wv = wv[:, :, np.linspace(0, wv.shape[2] - 1, n_rows * n_cols, dtype='int64')]
-    max_amplitude = target_wv.max(axis=(0, 1, 2))
-    min_amplitude = target_wv.min(axis=(0, 1, 2))
-
-    fig = plt.figure(figsize=(28, 10))
-
-    # gridspec inside gridspec
-    outer_grid = gridspec.GridSpec(1, 2, wspace=0.0, hspace=0.0, width_ratios=[20, 8])
-    inner_grid = gridspec.GridSpecFromSubplotSpec(n_rows, n_cols, subplot_spec=outer_grid[0], wspace=0.0, hspace=0.0)
-
-    # waveform plots
-    for nr in range(n_rows):
-        for nc in range(n_cols):
-            n = nc + nr * n_cols
-            ax = plt.Subplot(fig, inner_grid[n])
-            ax.axis('off')
-            ax.plot(target_wv[:, :, n], linewidth=1)
-            ax.set_ylim(min_amplitude, max_amplitude)
-            fig.add_subplot(ax)
-
-    target_wv = wv[:, :, np.linspace(0, wv.shape[2] - 1, n_overlay, dtype='int64')]
-    ch_grid = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=outer_grid[1], wspace=0.0, hspace=0.0)
-    for nr in range(2):
-        for nc in range(2):
-            n = nc + nr * 2
-            ax = plt.Subplot(fig, ch_grid[n])
-            ax.plot(target_wv[:, n, :], linewidth=1, c=f'C{n}', alpha=.02)
-            ax.axis('off')
-            ax.set_ylim(min_amplitude, max_amplitude)
-            fig.add_subplot(ax)
-
-    return fig
-
-
-def plot_feature(feature, feature_name='', timestamps=None):
-    num_features = feature.shape[1]
-    if num_features > 16:
-        raise ValueError("More than 16 features found, indicating wrong array shape.")
-
-    fig, ax = plt.subplots(2, num_features, figsize=(16, 6))
-    yq_l, yq_h = np.quantile(feature[:, 0], .1), np.quantile(feature[:, 0], .9)
-
-    for n, num_fet in enumerate(range(0, num_features)):
-        lim_l, lim_h = np.quantile(feature[:, num_fet], .1), np.quantile(feature[:, num_fet], .9)
-        if n:
-            ax[0, n].scatter(feature[:, 0], feature[:, num_fet], s=.2, alpha=.1)
-            ax[0, n].set_title('{fn}:{n} / {fn}:0'.format(fn=feature_name, n=num_fet))
-            ax[0, n].set_xlim(yq_l, yq_h)
-            ax[0, n].set_ylim(lim_l, lim_h)
-        else:
-            # TODO: PLOT EVENTS PER SECOND
-            ax[0, n].plot(timestamps)
-
-        ax[1, n].scatter(timestamps, feature[:, num_fet], s=.2, alpha=.1)
-        ax[1, n].set_ylim(lim_l, lim_h)
-
-    return fig
-
-
 def write_features_fet(feature_data, outpath):
-    start = time.time()
     # TODO: Channel validity
+    start = time.time()
     fet_data = np.hstack(list(feature_data))
+    logger.debug('hstack fet data in {:.2f} s'.format(time.time() - start))
+    logging.info("fet_data is {} MB, shape: {}".format(fet_data.nbytes / 1e6, fet_data.shape))
+
+    start = time.time()
     with open(outpath, 'w') as fet_file:
         fet_file.write(f' {fet_data.shape[1]}\n')
 
         np.savetxt(fet_file, fet_data, fmt='%-16.8f', delimiter=' ')
-        # for row in fet_data:
-        #     fet_file.writelines(' '.join(map(str, list(row))))
-        #     fet_file.write('\n')
-    print(time.time() - start)
+    logger.debug('Wrote fet file in {:.2f} s'.format(time.time() - start))
+
+    # # faster variant, but only saves ~7 seconds/1M spikes @ 32 features
+    # start = time.time()
+    # with open(outpath.with_suffix('.test'), 'w') as fet_file:
+    #     fet_file.write(f' {fet_data.shape[1]}\n')
+    #     fmt = ' '.join(['%g'] * fet_data.shape[1])
+    #     fmt = '\n'.join([fmt] * fet_data.shape[0])
+    #     fet_string = fmt % tuple(fet_data.ravel())
+    #     fet_file.write(fet_string)
+    # logger.debug('VARIANT: Wrote fet file in {:.2f} s'.format(time.time() - start))
 
 
 def write_feature_fd(feature_names, feature_data, timestamps, outpath, tetrode_path, channel_validity=None):
@@ -233,7 +190,7 @@ def main(args):
     parser.add_argument('--sampling-rate', type=float, help='Sampling rate. Default 30000 Hz', default=3e4)
     parser.add_argument('-f', '--force', action='store_true', help='Force overwrite of existing files.')
     parser.add_argument('-a', '--align', help='Alignment method, default: min', default='min')
-    parser.add_argument('-F', '--features', nargs=-1, help='Features to use. Default: energy', default=['energy'])
+    parser.add_argument('-F', '--features', nargs='*', help='Features to use. Default: energy', default=['energy'])
     parser.add_argument('--ignore-prb', action='store_true',
                         help='Do not load channel validity from dead channels in .prb files')
     parser.add_argument('--no-report', action='store_true', help='Do not generate report file (saves time)')
@@ -257,13 +214,13 @@ def main(args):
         if prb_path.exists():
             prb = run_prb(prb_path)
         else:
-            logging.warning(f'No probe file found for {matfile} and no channel validity given.')
+            logger.warning(f'No probe file found for {matfile} and no channel validity given.')
             prb = None
         if prb is None or 'dead_channels' not in prb:
             channel_validity = [1, 1, 1, 1]
         else:
             channel_validity = [int(ch not in prb['dead_channels']) for ch in prb['channel_groups'][0]['channels']]
-        logging.debug('channel validity: {}'.format(channel_validity) + ('' if all(
+        logger.debug('channel validity: {}'.format(channel_validity) + ('' if all(
             channel_validity) else f', {4 - sum(channel_validity)} dead channel(s)'))
 
         hf = h5py.File(matfile, 'r')
@@ -285,13 +242,13 @@ def main(args):
             elif fet_name == 'cpca':
                 logging.debug(f'Calculating {fet_name} feature')
                 cpca = scale_feature(feature_cPCA(waveforms))
-                print('cpca shape', cpca.shape)
+                logger.debug('cpca shape {}'.format(cpca.shape))
                 features['cPCA'] = cpca
 
             elif fet_name == 'chwpca':
                 logging.debug(f'Calculating {fet_name} feature')
                 chwpca = scale_feature(feature_chwPCA(waveforms))
-                print('chw pca', chwpca.shape)
+                logger.debug('chw pca shape {}'.format(chwpca.shape))
                 features['chwPCA'] = chwpca
 
         # TODO:
@@ -302,19 +259,87 @@ def main(args):
         # fet_pos = feature_position(matpath / 'XY_data.mat', dat_offsets=n_bytes, timestamps=timestamps,
         #                            indices=indices)
 
-        with open(matfile.with_suffix('.html'), 'w') as fet_report_file:
-            logging.debug('Generating waveform graphic')
-            fig = plot_waveforms_grid(waveforms)
-            fet_report_file.write(fig2html(fig))
-            del fig
-
         fet_file_path = outpath / matfile.with_suffix('.fet.0').name
-        logging.debug(f'Writing .fet file {fet_file_path}')
+        logger.debug(f'Writing .fet file {fet_file_path}')
         write_features_fet(feature_data=features.values(), outpath=fet_file_path)
 
         # feature_names = ['energy', 'cPCA']
         # fd_features = [fet_energy, fet_cpca_4]
+        logger.debug('Writing feature .fd files')
         for fet_name, fet_data in features.items():
             write_feature_fd(feature_names=fet_name, feature_data=fet_data,
                              timestamps=timestamps, outpath=outpath, tetrode_path=matfile,
                              channel_validity=channel_validity)
+
+        logger.debug('Generating waveform graphic')
+        with open(matfile.with_suffix('.html'), 'w') as frf:
+            frf.write('<head></head><body><h1>{}</h1>'.format(matfile.name))
+
+            frf.write('<h2>Waveforms (n={})</h2>'.format(waveforms.shape[2]))
+            density_agg = 'log'
+            images = ds_shade_waveforms(waveforms, how=density_agg)
+            fig = ds_plot_waveforms(images, density_agg)
+            frf.write(fig2html(fig) + '</br>')
+            del fig
+
+            for fet_name, fet_data in features.items():
+                frf.write('<h3>Feature: {}</h3>\n'.format(fet_name))
+
+                # NOTE: Dtype is float32, but numba crashes due to some dtype mismatch. Casting to float64 solves this.
+                df_fet = pd.DataFrame(fet_data)
+
+                # numerical column names are an issue with datashader, stringify 'em
+                df_fet.rename(columns={k: str(k) for k in df_fet.columns}, inplace=True)
+                df_fet['time'] = timestamps
+
+                fet_columns = df_fet.columns[:-1]
+
+                # Features vs. features
+                images = []
+                titles = []
+                for cc in list(combinations(fet_columns, 2)):
+                    fet_title = f'{fet_name}:{cc[1]} vs {fet_name}:{cc[0]}'
+                    logger.debug(f'plotting feature {fet_title}')
+
+                    # Calculate display limits, try to exclude outliers
+                    # TODO: correct axis labeling
+                    perc_lower = 0.05
+                    perc_upper = 99.9
+                    x_range = (np.percentile(df_fet[cc[0]], perc_lower), np.percentile(df_fet[cc[0]], perc_upper))
+                    y_range = (np.percentile(df_fet[cc[1]], perc_lower), np.percentile(df_fet[cc[1]], perc_upper))
+
+                    shade = ds_shade_feature(df_fet[[cc[0], cc[1]]], x_range=x_range, y_range=y_range,
+                                             color_map='inferno')
+                    images.append(shade)
+                    titles.append(fet_title)
+
+                fet_fig = ds_plot_features(images, how='log', fet_titles=titles)
+                frf.write(fig2html(fet_fig) + '</br>\n')
+                del fet_fig
+
+                # Features over time
+                t_images = []
+                t_titles = []
+                x_range = (0, df_fet['time'].max())
+
+                # Calculate display limits, try to exclude outliers
+                # TODO: correct axis labeling
+                perc_lower = 0.1
+                perc_upper = 99.9
+                y_range = (np.percentile(df_fet[cc[1]], perc_lower), np.percentile(df_fet[cc[1]], perc_upper))
+
+                for cc in fet_columns:
+                    t_title = f'{fet_name}:{cc} vs. time'
+                    logger.debug(f'plotting {t_title}')
+                    shade = ds_shade_feature(df_fet[['time', cc]], x_range=x_range, y_range=y_range,
+                                             color_map='viridis')
+                    t_images.append(shade)
+                    t_titles.append(t_title)
+
+                t_fig = ds_plot_features(t_images, how='log', fet_titles=t_titles)
+                frf.write(fig2html(t_fig) + '</br>\n')
+                del t_fig
+
+                frf.write('</hr>\n')
+
+                # np.save('{}.npy'.format(fet_name), fet_data)
