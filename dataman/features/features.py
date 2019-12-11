@@ -288,7 +288,8 @@ def main(args):
 
             frf.write('<h2>Waveforms (n={})</h2>'.format(waveforms.shape[2]))
             density_agg = 'log'
-            images = ds_shade_waveforms(waveforms, how=density_agg)
+            with np.errstate(invalid='ignore'):
+                images = ds_shade_waveforms(waveforms, how=density_agg)
             fig = ds_plot_waveforms(images, density_agg)
             frf.write(fig2html(fig) + '</br>')
             del fig
@@ -318,9 +319,9 @@ def main(args):
                     perc_upper = 99.9
                     x_range = (np.percentile(df_fet[cc[0]], perc_lower), np.percentile(df_fet[cc[0]], perc_upper))
                     y_range = (np.percentile(df_fet[cc[1]], perc_lower), np.percentile(df_fet[cc[1]], perc_upper))
-
-                    shade = ds_shade_feature(df_fet[[cc[0], cc[1]]], x_range=x_range, y_range=y_range,
-                                             color_map='inferno')
+                    with np.errstate(invalid='ignore'):
+                        shade = ds_shade_feature(df_fet[[cc[0], cc[1]]], x_range=x_range, y_range=y_range,
+                                                 color_map='inferno')
                     images.append(shade)
                     titles.append(fet_title)
 
@@ -342,8 +343,9 @@ def main(args):
                 for cc in fet_columns:
                     t_title = f'{fet_name}:{cc} vs. time'
                     logger.debug(f'plotting {t_title}')
-                    shade = ds_shade_feature(df_fet[['time', cc]], x_range=x_range, y_range=y_range,
-                                             color_map='viridis')
+                    with np.errstate(invalid='ignore'):
+                        shade = ds_shade_feature(df_fet[['time', cc]], x_range=x_range, y_range=y_range,
+                                                 color_map='viridis')
                     t_images.append(shade)
                     t_titles.append(t_title)
 
