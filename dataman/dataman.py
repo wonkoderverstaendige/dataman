@@ -140,6 +140,8 @@ def main():
         conv    Convert formats and layouts
         ref     Creating references/reference-subtracting data
         split   Split file into separate files bundling channels
+        detect  Detect and extract spikes from the wideband signal
+        feature Calculate features from waveforms for clustering
         ''')
     parser.add_argument('command', help='Command to execute', nargs='?', default=None)
     parser.add_argument('-v', '--verbose', action='count',
