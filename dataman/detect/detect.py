@@ -410,16 +410,16 @@ def main(args):
     logger.debug('Arguments: {}'.format(cli_args))
 
     stddev_factor = cli_args.threshold
-    logger.debug('Thresold factor   : ', stddev_factor)
+    logger.debug('Threshold factor  : {}'.format(stddev_factor))
 
     fs = cli_args.sampling_rate
-    logger.debug('Sampling rate     : ', fs)
+    logger.debug('Sampling rate     : {}'.format(fs))
 
     noise_percentile = cli_args.noise_percentile
-    logger.debug('Noise percentile : ', noise_percentile)
+    logger.debug('Noise percentile : {}'.format(noise_percentile))
 
     alignment_method = cli_args.align
-    logger.debug('Alignment method : ', alignment_method)
+    logger.debug('Alignment method : {}'.format(alignment_method))
 
     target = Path(cli_args.target)
     tetrode_files = sorted(target.glob('tetrode*.dat'))
