@@ -422,7 +422,11 @@ def main(args):
     logger.debug('Alignment method : {}'.format(alignment_method))
 
     target = Path(cli_args.target)
-    tetrode_files = sorted(target.glob('tetrode*.dat'))
+    if target.is_file() and target.exists():
+        tetrode_files = [target]
+        logger.debug('Using single file mode with {}'.format(target))
+    else:
+        tetrode_files = sorted(target.glob('tetrode*.dat'))
 
     start = int(cli_args.start * fs) if cli_args.start is not None else 0
     end = int(cli_args.end * fs) if cli_args.end is not None else -1
