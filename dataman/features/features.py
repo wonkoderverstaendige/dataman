@@ -34,7 +34,11 @@ AVAILABLE_FEATURES = ['energy', 'cpca', 'chwpca', 'position']
 
 def scale_feature(fet):
     nfet = fet - np.mean(fet, axis=0)
-    nfet /= np.std(nfet, axis=0)
+    std = np.std(nfet, axis=0)
+    if not std.all():
+        logging.warning('Zeros in standard deviation of feature normalizaton, setting those to 1.0')
+        std[std == 0] = 1
+    nfet /= std
     return nfet
 
 
@@ -129,14 +133,19 @@ def feature_chwPCA(wv, dims=3, energy_normalize=True):
             zero_energy_waveforms = (l2 == 0).nonzero()
             if zero_energy_waveforms[0].shape[0]:
                 logger.warning(
-                    'Found {} instances of zero-energy waveforms in channel {}. Settings those to l2=1.0'.format(
+                    'Found {} instances of zero-energy waveforms in channel {}. Settings those to energy=1.0'.format(
                         zero_energy_waveforms[0].shape[0], d))
                 l2[zero_energy_waveforms] = 1.0
 
-            # normalize all waveforms by their l2 norm/energy
+            # normaliz
+            # e all waveforms by their l2 norm/energy
             data /= l2
 
-        pca_scores.append(pca.fit_transform(data))
+        scores = pca.fit_transform(data)
+        if np.isnan(scores).any():
+            logger.warning('NaN in PCA scores, setting those to 0.0')
+            scores.nan_to_num(0)
+        pca_scores.append(scores)
         pcas.append(pca)
     pca_scores = np.concatenate(pca_scores, axis=1)
     return pca_scores
@@ -252,11 +261,11 @@ def main(args):
         features = {}
         for fet_name in map(str.lower, cli_args.features):
             if fet_name == 'energy':
-                logging.debug(f'Calculating {fet_name} feature')
+                logger.debug(f'Calculating {fet_name} feature')
                 features['energy'] = scale_feature(feature_energy(waveforms))
 
             elif fet_name == 'peak':
-                logging.debug(f'Calculating {fet_name} feature')
+                logger.debug(f'Calculating {fet_name} feature')
                 features['peak'] = feature_peak(waveforms)
 
             elif fet_name == 'cpca':
