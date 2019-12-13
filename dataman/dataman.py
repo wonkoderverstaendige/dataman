@@ -4,24 +4,14 @@
 import argparse
 import cmd
 import logging
-import os
 import os.path as op
 import sys
-import subprocess
+
+from dataman.__version__ import __version__, GIT_VERSION
 from dataman.lib.constants import LOG_LEVEL_VERBOSE
 
 LOG_LEVEL_DEFAULT = logging.INFO
 LOG_LEVEL_DEBUG = logging.DEBUG
-
-__version__ = '0.3.0'
-
-current_path = os.getcwd()
-try:
-    os.chdir(op.dirname(__file__))
-    GIT_VERSION = subprocess.check_output(["git", "describe", "--always"]).strip().decode('utf-8')
-except subprocess.CalledProcessError as e:
-    GIT_VERSION = "Unknown"
-os.chdir(current_path)
 
 
 class DataMan(cmd.Cmd):
@@ -29,7 +19,7 @@ class DataMan(cmd.Cmd):
 
     prompt = "dm> "
     intro = "+ DataMan is here to help! +"
-    intro = '\n'.join(["="*len(intro), intro, "="*len(intro)])
+    intro = '\n'.join(["=" * len(intro), intro, "=" * len(intro)])
 
     log = logging.getLogger(__name__)
 
@@ -45,7 +35,7 @@ class DataMan(cmd.Cmd):
         self.log.debug('Starting dataman v{} @git [{}]'.format(__version__, GIT_VERSION))
 
     def do_ls(self, args_string):
-        parser = argparse.ArgumentParser('Recording statistics',)
+        parser = argparse.ArgumentParser('Recording statistics', )
         parser.add_argument('path', help='Relative or absolute path to directory',
                             default='.', nargs='?')
         parser.add_argument('-d', '--debug', action='store_true',
@@ -105,6 +95,11 @@ class DataMan(cmd.Cmd):
         features.main(args_string.split(' '))
 
     @staticmethod
+    def do_cluster(args_string):
+        from dataman.cluster import cluster
+        cluster.main(args_string.split(' '))
+
+    @staticmethod
     def do_check(args_string):
         pass
 
@@ -140,13 +135,16 @@ def main():
         conv    Convert formats and layouts
         ref     Creating references/reference-subtracting data
         split   Split file into separate files bundling channels
-        detect  Detect and extract spikes from the wideband signal
-        feature Calculate features from waveforms for clustering
+        detect  Detect and extract spikes from the wide-band signal
+        feature Calculate features from waveforms used for clustering
+        cluster Prepare and run KlustaKwik for generated features
         ''')
     parser.add_argument('command', help='Command to execute', nargs='?', default=None)
     parser.add_argument('-v', '--verbose', action='count',
                         help='Verbosity level -v: Debug, -vv: Verbose mode.')
-    parser.add_argument('--version', action='version', version='%(prog)s {version}'.format(version=__version__))
+    parser.add_argument('--version', action='version',
+                        version='%(prog)s {version} @git {git_version}'.format(version=__version__,
+                                                                           git_version=GIT_VERSION))
     parser.add_argument('-h', '--help', action='store_true', help='Show help text.')
 
     cli_args, cmd_args = parser.parse_known_args()
