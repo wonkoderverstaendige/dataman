@@ -424,6 +424,7 @@ def main(args):
     target = Path(cli_args.target)
     if target.is_file() and target.exists():
         tetrode_files = [target]
+        target = target.parent
         logger.debug('Using single file mode with {}'.format(target))
     else:
         tetrode_files = sorted(target.glob('tetrode*.dat'))
