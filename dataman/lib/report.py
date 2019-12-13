@@ -1,7 +1,7 @@
 import base64
 import io
+import logging
 import urllib
-from itertools import combinations
 
 import datashader as ds
 import numpy as np
@@ -12,6 +12,13 @@ from matplotlib import pyplot as plt, image as mpimg, cm
 from dataman.detect.report import DS_CMAPS
 
 plt.rcParams['figure.figsize'] = 15, 8
+
+logger = logging.getLogger(__name__)
+
+# disable font_manager spamming the debug log
+# logging.getLogger('matplotlib').disabled = True
+logging.getLogger('matplotlib.fontmanager').disabled = True
+logging.getLogger('matplotlib.font_manager').disabled = True
 
 
 def fig2html(fig):

@@ -16,6 +16,11 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# disable font_manager spamming the debug log
+# logging.getLogger('matplotlib').disabled = True
+logging.getLogger('matplotlib.fontmanager').disabled = True
+logging.getLogger('matplotlib.font_manager').disabled = True
+
 WRITE_DATA = True
 FORMATS = {fmt.FMT_NAME.lower(): fmt for fmt in get_valid_formats()}
 

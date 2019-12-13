@@ -21,6 +21,11 @@ sampling_rate = 3e4
 
 logger = logging.getLogger(__name__)
 
+# disable font_manager spamming the debug log
+# logging.getLogger('matplotlib').disabled = True
+logging.getLogger('matplotlib.fontmanager').disabled = True
+logging.getLogger('matplotlib.font_manager').disabled = True
+
 # Available features
 # TODO: per feature CLI arguments
 # TODO: feature discovery as modules
