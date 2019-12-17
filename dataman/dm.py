@@ -7,7 +7,7 @@ import logging
 import os.path as op
 import sys
 
-from dataman.__version__ import __version__, GIT_VERSION
+from dataman import __version__ as version
 from dataman.lib.constants import LOG_LEVEL_VERBOSE
 
 LOG_LEVEL_DEFAULT = logging.INFO
@@ -32,7 +32,7 @@ class DataMan(cmd.Cmd):
         return line
 
     def intro_dbg(self):
-        self.log.debug('Starting dataman v{} @git [{}]'.format(__version__, GIT_VERSION))
+        self.log.debug('Starting dataman v{} @git [{}]'.format(version.__version__, version.GIT_VERSION))
 
     def do_ls(self, args_string):
         parser = argparse.ArgumentParser('Recording statistics', )
@@ -143,8 +143,8 @@ def main():
     parser.add_argument('-v', '--verbose', action='count',
                         help='Verbosity level -v: Debug, -vv: Verbose mode.')
     parser.add_argument('--version', action='version',
-                        version='%(prog)s {version} @git {git_version}'.format(version=__version__,
-                                                                           git_version=GIT_VERSION))
+                        version='%(prog)s {version} @git {git_version}'.format(version=version.__version__,
+                                                                               git_version=version.GIT_VERSION))
     parser.add_argument('-h', '--help', action='store_true', help='Show help text.')
 
     cli_args, cmd_args = parser.parse_known_args()

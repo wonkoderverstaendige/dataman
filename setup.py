@@ -14,4 +14,4 @@ setup(name='dataman',
                         'scikit-learn', 'datashader', 'pandas'],
       packages=['dataman'],
       entry_points="""[console_scripts]
-            dm=dataman.dataman:main""")
+            dm=dataman.dm:main""")
