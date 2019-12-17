@@ -233,6 +233,7 @@ def main(args):
     parser.add_argument('-f', '--force', action='store_true', help='Force overwrite of existing files.')
     parser.add_argument('-a', '--align', help='Alignment method, default: min', default='min')
     parser.add_argument('-F', '--features', nargs='*', help='Features to use. Default: energy', default=['energy'])
+    parser.add_argument('--to_fet', nargs='*', help='Features to include in fet file, default: all')
     parser.add_argument('--ignore-prb', action='store_true',
                         help='Do not load channel validity from dead channels in .prb files')
     parser.add_argument('--no-report', action='store_true', help='Do not generate report file (saves time)')
