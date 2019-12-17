@@ -1,0 +1,4 @@
+KLUSTAKWIK_PATH_WIN: KlustaKwik.exe
+KLUSTAKWIK_PATH_UNIX: KlustaKwik
+
+TARGET_FILE_GLOB: tetrode*.dat
