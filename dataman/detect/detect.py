@@ -30,7 +30,6 @@ def get_batches(length, batch_size):
     return batches
 
 
-
 def estimate_noise(arr, lc=300, hc=6000, num_channels=4, fs=3e4, uV_factor=0.195):
     ne_binsize = int(fs)  # noise estimation binsize
 
@@ -327,7 +326,8 @@ def detect_spikes(arr, thresholds, fs=3e4, chunk_size_s=60, lc=300, hc=6000, s_p
     return valids
 
 
-def extract_waveforms(timestamps, arr, outpath, s_pre=8, s_post=24, lc=300, hc=6000, chunk_size_s=60, fs=3e4):
+def extract_waveforms(timestamps, arr, outpath, s_pre=10, s_post=22, lc=300, hc=6000, chunk_size_s=60, fs=3e4):
+    # TODO: fix hard coded values, e.g 128, 0.05 ...
     assert max(timestamps) + s_post < arr.shape[0]
     assert min(timestamps) - s_pre >= 0
 
@@ -388,6 +388,7 @@ def extract_waveforms(timestamps, arr, outpath, s_pre=8, s_post=24, lc=300, hc=6
                 break
         waveforms = np.array(hf['spikes'], dtype='int16').reshape(s_pre+s_post, n_channels, -1)
     return waveforms
+
 
 def main(args):
     parser = argparse.ArgumentParser('Detect spikes in .dat files')
@@ -501,7 +502,7 @@ def main(args):
         logger.info(f'{tetrode_file.name}: {len(timestamps)} spikes, {sps:.1f} sps')
 
         # Spike Waveform Extraction ##################################################
-        waveforms = extract_waveforms(timestamps, wb, outpath=matpath, s_pre=8, s_post=24, fs=fs)
+        waveforms = extract_waveforms(timestamps, wb, outpath=matpath, s_pre=10, s_post=22, fs=fs)
 
         # Create waveform plots
         logger.debug('Creating waveform plots')

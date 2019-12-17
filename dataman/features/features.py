@@ -60,6 +60,12 @@ def feature_energy(wv):
     return np.sqrt(np.sum(wv ** 2, axis=0)).T
 
 
+def feature_energy24(wv):
+    """Calculate l2 (euclidean) norm for vector containing spike waveforms for the first 24 samples
+    """
+    return np.sqrt(np.sum(wv[:24, :, :] ** 2, axis=0)).T
+
+
 def feature_weighted_energy(wv, dropoff=.1, s_pre=8, s_post=16):
     """Calculate l2 (euclidean) norm for vectors of spike waveform, where
     waveform amplitudes are weighted towards the peak/detection center at dropoff rate"""
@@ -111,6 +117,17 @@ def feature_cPCA(wv, n_components=12, incremental=False, batch_size=None):
         raise NotImplementedError("Can't run incremental PCA yet.")
 
     ers = np.reshape(np.transpose(wv, axes=(1, 0, 2)), (N_SAMPLES * N_CHANNELS, -1))
+    pca = PCA(n_components)
+    scores = pca.fit_transform(ers.T)
+    return scores
+
+
+def feature_cPCA24(wv, n_components=12, incremental=False, batch_size=None):
+    """Concatenated PCA. Uses first 24 samples of concatenated channels."""
+    if incremental:
+        raise NotImplementedError("Can't run incremental PCA yet.")
+
+    ers = np.reshape(np.transpose(wv[:24, :, :], axes=(1, 0, 2)), (24 * N_CHANNELS, -1))
     pca = PCA(n_components)
     scores = pca.fit_transform(ers.T)
     return scores
@@ -216,6 +233,7 @@ def main(args):
     parser.add_argument('-f', '--force', action='store_true', help='Force overwrite of existing files.')
     parser.add_argument('-a', '--align', help='Alignment method, default: min', default='min')
     parser.add_argument('-F', '--features', nargs='*', help='Features to use. Default: energy', default=['energy'])
+    parser.add_argument('--to_fet', nargs='*', help='Features to include in fet file, default: all')
     parser.add_argument('--ignore-prb', action='store_true',
                         help='Do not load channel validity from dead channels in .prb files')
     parser.add_argument('--no-report', action='store_true', help='Do not generate report file (saves time)')
@@ -264,6 +282,10 @@ def main(args):
                 logger.debug(f'Calculating {fet_name} feature')
                 features['energy'] = scale_feature(feature_energy(waveforms))
 
+            elif fet_name == 'energy24':
+                logger.debug(f'Calculating {fet_name} feature')
+                features['energy24'] = scale_feature(feature_energy24(waveforms))
+
             elif fet_name == 'peak':
                 logger.debug(f'Calculating {fet_name} feature')
                 features['peak'] = feature_peak(waveforms)
@@ -271,14 +293,23 @@ def main(args):
             elif fet_name == 'cpca':
                 logging.debug(f'Calculating {fet_name} feature')
                 cpca = scale_feature(feature_cPCA(waveforms))
-                logger.debug('cpca shape {}'.format(cpca.shape))
+                logger.debug('cPCA shape {}'.format(cpca.shape))
                 features['cPCA'] = cpca
+
+            elif fet_name == 'cpca24':
+                logging.debug(f'Calculating {fet_name} feature')
+                cpca24 = scale_feature(feature_cPCA24(waveforms))
+                logger.debug('cPCA24 shape {}'.format(cpca24.shape))
+                features['cPCA24'] = cpca24
 
             elif fet_name == 'chwpca':
                 logging.debug(f'Calculating {fet_name} feature')
                 chwpca = scale_feature(feature_chwPCA(waveforms))
-                logger.debug('chw pca shape {}'.format(chwpca.shape))
+                logger.debug('chwPCA shape {}'.format(chwpca.shape))
                 features['chwPCA'] = chwpca
+
+            else:
+                raise NotImplementedError("Unknonw feature: {}".format(fet_name))
 
         # TODO:
         # fet_cpca_4 = fet_cpca[:, :4]
@@ -288,17 +319,23 @@ def main(args):
         # fet_pos = feature_position(matpath / 'XY_data.mat', dat_offsets=n_bytes, timestamps=timestamps,
         #                            indices=indices)
 
-        fet_file_path = outpath / matfile.with_suffix('.fet.0').name
-        logger.debug(f'Writing .fet file {fet_file_path}')
-        write_features_fet(feature_data=features.values(), outpath=fet_file_path)
+        if len(cli_args.to_fet) == 1 is not None and cli_args.to_fet[0].lower() == 'none':
+            logger.warning('Skipping fet file generation')
+        else:
+            fet_file_path = outpath / matfile.with_suffix('.fet.0').name
+            logger.debug(f'Writing .fet file {fet_file_path}')
+            if cli_args is None:
+                logger.debug('Writing all features to fet file.')
+            else:
+                logger.debug('Only writing fetures {} to fet file'.format(cli_args.to_fet))
+            fet_data = [fd for fn, fd in features.items() if (fn.lower() in cli_args.to_fet) or not cli_args.to_fet]
+            write_features_fet(feature_data=fet_data, outpath=fet_file_path)
 
-        # feature_names = ['energy', 'cPCA']
-        # fd_features = [fet_energy, fet_cpca_4]
-        logger.debug('Writing feature .fd files')
-        for fet_name, fet_data in features.items():
-            write_feature_fd(feature_names=fet_name, feature_data=fet_data,
-                             timestamps=timestamps, outpath=outpath, tetrode_path=matfile,
-                             channel_validity=channel_validity)
+            logger.debug('Writing feature .fd files')
+            for fet_name, fet_data in features.items():
+                write_feature_fd(feature_names=fet_name, feature_data=fet_data,
+                                 timestamps=timestamps, outpath=outpath, tetrode_path=matfile,
+                                 channel_validity=channel_validity)
 
         logger.debug('Generating waveform graphic')
         with open(matfile.with_suffix('.html'), 'w') as frf:
@@ -306,7 +343,7 @@ def main(args):
 
             frf.write('<h2>Waveforms (n={})</h2>'.format(waveforms.shape[2]))
             density_agg = 'log'
-            with np.errstate(invalid='ignore'):
+            with np.errstate(invalid='ignore'):  # ignore some matplotlib colormap usage errors
                 images = ds_shade_waveforms(waveforms, how=density_agg)
             fig = ds_plot_waveforms(images, density_agg)
             frf.write(fig2html(fig) + '</br>')
@@ -315,7 +352,6 @@ def main(args):
             for fet_name, fet_data in features.items():
                 frf.write('<h3>Feature: {}</h3>\n'.format(fet_name))
 
-                # NOTE: Dtype is float32, but numba crashes due to some dtype mismatch. Casting to float64 solves this.
                 df_fet = pd.DataFrame(fet_data)
 
                 # numerical column names are an issue with datashader, stringify 'em
@@ -374,3 +410,9 @@ def main(args):
                 frf.write('</hr>\n')
 
                 # np.save('{}.npy'.format(fet_name), fet_data)
+
+
+if __name__ == '__main__':
+    import sys
+    main(sys.argv[1:])
+
