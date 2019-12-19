@@ -118,7 +118,7 @@ def detect_spikes(arr, min_thresholds, max_sd=18, fs=3e4, chunk_size_s=60, chunk
     crs = []
 
     max_thr = use_thr * max_sd
-    if max_thr not in [None, 0]:
+    if max_thr is not None or max_thr != 0:
         logger.warning('Maximum rejection for spike detection not implemented.')
     # # waveform_chunks = []
     # rejections = 0

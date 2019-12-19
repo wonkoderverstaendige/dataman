@@ -104,7 +104,7 @@ class DataMan(cmd.Cmd):
 
     @staticmethod
     def do_fet(args_string):
-        DataMan.do_reference(args_string)
+        DataMan.do_features(args_string)
 
     @staticmethod
     def do_cluster(args_string):
