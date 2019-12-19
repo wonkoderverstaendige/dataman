@@ -32,7 +32,7 @@ def get_batches(length, batch_size):
     return batches
 
 
-def estimate_noise(arr, lc=300, hc=6000, num_channels=4, fs=3e4, uV_factor=0.195, ne_bin_s=1):
+def estimate_noise(arr, lc=300, hc=6000, num_channels=4, fs=3e4, microvolt_factor=0.195, ne_bin_s=1):
     """Calulate MAD (mean absolute deviation) of high pass filtered array.
     Returns list of bin-sized estimates in uV.
     """
@@ -47,7 +47,7 @@ def estimate_noise(arr, lc=300, hc=6000, num_channels=4, fs=3e4, uV_factor=0.195
     # Calculate MAD (mean absolute deviation) over chunks
     for n, batch in enumerate(tqdm(batches, leave=False, desc='1) estimating')):
         batch_size = min(ne_bin_size, arr.shape[0] - batch)
-        filtered = signal.filtfilt(b, a, arr[batch:batch + batch_size, :].astype(np.double), axis=0) * uV_factor
+        filtered = signal.filtfilt(b, a, arr[batch:batch + batch_size, :].astype(np.double), axis=0) * microvolt_factor
         for ch in range(num_channels):
             ne[n, ch] = np.median(abs(filtered[:, ch]) * nfac)
     return ne
@@ -68,8 +68,7 @@ def wv_alignment(w, method='centroid', kernel_width=11, interp_f=None):
     ch = np.min(w, axis=0).argmin()
     y = w[:, ch]
 
-    # Minimum alignment filter
-    # Peak negative amplitude
+    # Minimum alignment filter, i.e. peak negative amplitude
     if method == 'min':
         if not interp_f:
             m = np.argmin(y)
@@ -78,7 +77,6 @@ def wv_alignment(w, method='centroid', kernel_width=11, interp_f=None):
             raise NotImplementedError
 
     # Centroid alignment method
-    #
     # Convolve the waveform with a linear filter and find zero crossing
     elif method == 'centroid':
         # TODO: Use channel energy for weighted decisions?
@@ -113,15 +111,17 @@ def detect_spikes(arr, min_thresholds, max_sd=18, fs=3e4, chunk_size_s=60, chunk
 
     chunk_size = int(chunk_size_s * fs)  # chunk size for detection
 
-    uV_factor = 0.195
-    use_thr = min_thresholds / uV_factor
-    max_thr = use_thr * max_sd
+    microvolt_factor = 0.195
+    use_thr = min_thresholds / microvolt_factor
 
-    # waveform_chunks = []
     timestamps = []
     crs = []
 
-    rejections = 0
+    max_thr = use_thr * max_sd
+    if max_thr not in [None, 0]:
+        logger.warning('Maximum rejection for spike detection not implemented.')
+    # # waveform_chunks = []
+    # rejections = 0
 
     b, a = butter_bandpass(lc, hc, fs)
 
@@ -275,7 +275,7 @@ def extract_waveforms(timestamps, arr, outpath, s_pre=10, s_post=22, lc=300, hc=
             except IndexError:
                 logger.error('Spikes out of bounds!')
                 break
-        waveforms = np.array(hf['spikes'], dtype='int16').reshape(s_pre + s_post, n_channels, -1)
+        waveforms = np.array(hf['spikes'], dtype='int16').reshape([s_pre + s_post, n_channels, -1])
     return waveforms
 
 
