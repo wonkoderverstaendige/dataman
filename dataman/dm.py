@@ -70,14 +70,22 @@ class DataMan(cmd.Cmd):
         vis.run(args_string.split(' '))
 
     @staticmethod
-    def do_conv(args_string):
+    def do_convert(args_string):
         from dataman.conv import convert
         convert.main(args_string.split(' '))
 
     @staticmethod
-    def do_ref(args_string):
+    def do_conv(args_string):
+        DataMan.do_convert(args_string)
+
+    @staticmethod
+    def do_reference(args_string):
         from dataman.ref import referencing
         referencing.main(args_string.split(' '))
+
+    @staticmethod
+    def do_ref(args_string):
+        DataMan.do_reference(args_string)
 
     @staticmethod
     def do_split(args_string):
@@ -95,17 +103,21 @@ class DataMan(cmd.Cmd):
         features.main(args_string.split(' '))
 
     @staticmethod
+    def do_fet(args_string):
+        DataMan.do_reference(args_string)
+
+    @staticmethod
     def do_cluster(args_string):
         from dataman.cluster import cluster
         cluster.main(args_string.split(' '))
 
     @staticmethod
     def do_check(args_string):
-        pass
+        raise NotImplemented('check not implemented')
 
     @staticmethod
-    def do_proc(_):
-        print(sys.argv)
+    def do_proc(args_string):
+        raise NotImplemented('proc not implemented')
 
     @staticmethod
     def do_exit(_):
@@ -132,7 +144,7 @@ def main():
         cli     Interactive CLI
         ls      Basic target statistics
         vis     Simple data visualizer
-        conv    Convert formats and layouts
+        convert Convert formats and layouts
         ref     Creating references/reference-subtracting data
         split   Split file into separate files bundling channels
         detect  Detect and extract spikes from the wide-band signal
