@@ -216,9 +216,12 @@ def main(args):
     logger.debug('Arguments: {}'.format(cli_args))
 
     if cli_args.remove_trailing_zeros:
-        raise NotImplementedError("Can't remove trailing zeros just yet.")
+        raise NotImplementedError("Trailing zero removal not implemented (also not a good idea to begin with...)")
 
     targets = [op.abspath(op.expanduser(t)) for t in expand_sessions(cli_args.target)]
+    target_exists = [t for t in targets if op.exists(t)]
+    if not all(target_exists):
+        raise FileNotFoundError(f'Invalid targets found: {[t for ok, t in zip(target_exists, targets) if not ok]}')
 
     formats = list(set([util.detect_format(target) for target in targets]))
 
@@ -355,22 +358,6 @@ def main(args):
         with open(op.join(out_path, output_basename + '.prb'), 'w') as prb_out:
             prb_out.write('dead_channels = {}\n'.format(pprint.pformat(dead_channels)))
             prb_out.write('channel_groups = {}'.format(pprint.pformat(cg_out)))
-
-        # FIXME: Generation of .prm
-        # For now in separate script. Should take a .prm template that will be adjusted
-        # # Template parameter file
-        # prm_file_input = cli_args.params
-        # with open(op.join(out_path, output_basename + '.prm'), 'w') as prm_out:
-        #     if prm_file_input:
-        #         f = open(prm_file_input, 'r')
-        #         prm_in = f.read()
-        #         f.close()
-        #     else:
-        #         prm_in = pkgr.resource_string('config', 'default.prm').decode()
-        #     prm_out.write(prm_in.format(experiment_name=output_basename,
-        #                                 probe_file=output_basename + '.prb',
-        #                                 raw_file=output_file_path,
-        #                                 n_channels=len(channel_group['channels'])))
 
         logger.debug('Done! Total data length written: {}'.format(util.fmt_time(total_duration_written)))
 
