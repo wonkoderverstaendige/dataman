@@ -45,14 +45,14 @@ def expand_sessions(lot):
     paths into the target list.
     """
     targets = []
-    for t in lot:
-        if t.endswith('.session'):
-            with open(t, 'r') as session_file:
-                session_items = [tp.strip() for tp in session_file.readlines()]
-                logger.info("Expanding session file '{}' with {} targets".format(t, len(session_items)))
+    for target_path in lot:
+        if target_path.endswith('.session') or target_path.endswith('.txt'):
+            with open(target_path, 'r') as sf:
+                session_items = [target_path.strip() for target_path in sf.readlines()]
+                logger.info(f"Expanding session file '{target_path}' with {len(session_items)} targets")
                 targets.extend(session_items)
         else:
-            targets.append(t)
+            targets.append(target_path)
     return targets
 
 
