@@ -320,7 +320,7 @@ def main(args):
         output_fname = ''.join([output_basename, out_fext])
         output_file_path = op.join(out_path, output_fname)
 
-        with open(output_file_path + '.dman', 'w') as dman_offset_file:
+        with open(output_file_path + '.dataman.offsets', 'w') as dman_offset_file:
             dman_offset_file.write('target_path, num_samples\n')
 
         duration_written = 0
