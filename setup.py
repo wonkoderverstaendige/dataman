@@ -11,7 +11,7 @@ setup(name='dataman',
       author_email='ronny.eichler@gmail.com',
       version=__version__,
       install_requires=['nose', 'termcolor', 'vispy', 'numpy', 'tqdm', 'scipy', 'matplotlib', 'h5py', 'hdf5storage',
-                        'scikit-learn', 'datashader', 'pandas'],
+                        'scikit-learn', 'datashader', 'pandas', 'pyyaml'],
       packages=['dataman'],
       entry_points="""[console_scripts]
             dm=dataman.dm:main""")
