@@ -87,18 +87,18 @@ def main(args):
     if cli_args.KK is None and cli_args.cluster:
         raise FileNotFoundError('Could not find the KlustaKwik executable on the path, and none given.')
 
-    # Building KlustaKwik Command
-    # 1) Find KlustaKwik executable
-    mclust_path = Path('C:/Users/reichler/src/MClustPipeline/MClust/KlustaKwik')
-    pf_system = platform.system()
-    logger.debug(f'Platform: {pf_system}')
-    if pf_system == 'Linux':
-        kk_executable = mclust_path / cfg['KLUSTAKWIK_PATH_LINUX']
-    elif pf_system == 'Windows':
-        kk_executable = mclust_path / cfg['KLUSTAKWIK_PATH_WINDOWS']
-    else:
-        raise NotImplemented(f'No KlustaKwik executable defined for platform {pf_system}')
-    logger.debug(kk_executable)
+    # # Building KlustaKwik Command
+    # # 1) Find KlustaKwik executable
+    # mclust_path = Path('C:/Users/reichler/src/MClustPipeline/MClust/KlustaKwik')
+    # pf_system = platform.system()
+    # logger.debug(f'Platform: {pf_system}')
+    # if pf_system == 'Linux':
+    #     kk_executable = mclust_path / cfg['KLUSTAKWIK_PATH_LINUX']
+    # elif pf_system == 'Windows':
+    #     kk_executable = mclust_path / cfg['KLUSTAKWIK_PATH_WINDOWS']
+    # else:
+    #     raise NotImplemented(f'No KlustaKwik executable defined for platform {pf_system}')
+    # logger.debug(kk_executable)
 
     # 2) Find target file stem
     working_dir = Path(cli_args.target).resolve()
