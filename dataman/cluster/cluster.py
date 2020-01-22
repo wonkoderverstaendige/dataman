@@ -100,6 +100,8 @@ def main(args):
     #     raise NotImplemented(f'No KlustaKwik executable defined for platform {pf_system}')
     # logger.debug(kk_executable)
 
+    kk_executable = cli_args.KK
+
     # 2) Find target file stem
     working_dir = Path(cli_args.target).resolve()
     logger.debug(f'Base path: {working_dir}')
