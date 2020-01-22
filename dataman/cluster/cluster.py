@@ -104,13 +104,14 @@ def main(args):
 
     # 2) Find target file stem
     working_dir = Path(cli_args.target).resolve()
-    logger.debug(f'Base path: {working_dir}')
     if working_dir.is_file() and working_dir.exists():
         tetrode_files = [working_dir.name]
         working_dir = working_dir.parent
         logger.debug(f'Using single file mode with {str(tetrode_files[0])}')
     else:
         tetrode_files = sorted([tf.name for tf in working_dir.glob(cfg['TARGET_FILE_GLOB'])])
+
+    logger.debug(f'Working dir: {working_dir}')
 
     # No parallel/serial execution supported right now
     if len(tetrode_files) > 1:
@@ -127,7 +128,9 @@ def main(args):
 
     # 4) combine executable and arguments
     kk_cmd = f'{kk_executable} {tetrode_file_stem} -ElecNo {tetrode_file_elecno}'
+    kk_cmd_list = kk_cmd.split(' ')
     logger.debug(f'KK COMMAND: {kk_cmd}')
+    logger.debug(f'KK COMMAND LIST: {kk_cmd_list}')
 
     # Call KlustaKwik and gather output
     # TODO: Use communicate to interact with KK, i.e. write to log and monitor progress
@@ -141,7 +144,7 @@ def main(args):
 
     # EXECUTE KLUSTAKWIK
     if not clu_file.exists() or cli_args.force:
-        kk_call = subprocess.run(kk_cmd.split(' '), stderr=subprocess.PIPE, stdout=stdout)
+        kk_call = subprocess.run(kk_cmd_list, stderr=subprocess.PIPE, stdout=stdout)
         kk_error = kk_call.returncode
 
         logger.debug('Writing klustakwik log file')
