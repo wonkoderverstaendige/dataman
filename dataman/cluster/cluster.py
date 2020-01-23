@@ -147,8 +147,8 @@ def main(args):
         kk_call = subprocess.run(kk_cmd_list, stderr=subprocess.PIPE, stdout=stdout)
         kk_error = kk_call.returncode
 
-        logger.debug('Writing klustakwik log file')
-        with open(clu_file + '.log', 'w') as log_file:
+        logger.debug('Writing KlustaKwik log file')
+        with open(clu_file.with_suffix('.log'), 'w') as log_file:
             log_file.write(kk_call.stderr.decode('ascii'))
 
         # Check call return code and output
