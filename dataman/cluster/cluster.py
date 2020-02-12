@@ -138,13 +138,13 @@ def main(args):
     logger.info('Starting KlustaKwik process')
 
     if cfg['PRINT_KK_OUTPUT']:
-        stdout = subprocess.STDOUT
+        stdout = None
     else:
         stdout = subprocess.PIPE
 
     # EXECUTE KLUSTAKWIK
     if not clu_file.exists() or cli_args.force:
-        kk_call = subprocess.run(kk_cmd_list, stderr=subprocess.PIPE, stdout=stdout)
+        kk_call = subprocess.run(kk_cmd_list, stderr=subprocess.STDOUT, stdout=stdout)
         kk_error = kk_call.returncode
 
         logger.debug('Writing KlustaKwik log file')
