@@ -148,8 +148,11 @@ def main(args):
         kk_error = kk_call.returncode
 
         logger.debug('Writing KlustaKwik log file')
-        with open(clu_file.with_suffix('.log'), 'w') as log_file:
-            log_file.write(kk_call.stderr.decode('ascii'))
+        if kk_call.stdout is not None:
+            with open(clu_file.with_suffix('.log'), 'w') as log_file:
+                log_file.write(kk_call.stdout.decode('ascii'))
+        else:
+            logging.warning('Missing stdout, not writing log file!')
 
         # Check call return code and output
         if kk_error:
