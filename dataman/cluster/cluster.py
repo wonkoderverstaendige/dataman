@@ -38,7 +38,8 @@ def load_yaml(yaml_path):
     with open(yaml_path, 'r') as yf:
         return yaml.load(yf, Loader=yaml.SafeLoader) or {}
 
-def run_kk(cfg, target_path, run_kk=True):
+def run_kk(params, run_kk=True):
+    cfg, target_path = params
     tt_fname = target_path.name
     tetrode_file_stem = tt_fname.split(".")[0]
     tetrode_file_elecno = tt_fname.split(".")[-1]
@@ -57,7 +58,6 @@ def run_kk(cfg, target_path, run_kk=True):
     with open(validity_path) as vfp:
         validity_string = vfp.readline()
     logger.debug(f'Channel validity: {validity_string}')
-    validities = [int(val) for val in validity_string]
 
     # Combine executable and arguments
     kk_executable = cfg["kk_executable"]
@@ -215,13 +215,19 @@ def main(args):
         tetrode_files = sorted([tf.resolve() for tf in target_path.glob(cfg['TARGET_FILE_GLOB'])])
     logger.debug(f'Targets found: {tetrode_files}')
 
-    # No parallel/serial execution supported right now
-    if len(tetrode_files) > 1:
-        raise NotImplemented('Currently only one target file per call supported!')
+    from multiprocessing.pool import ThreadPool
+    pool = ThreadPool(processes=4)
 
-    for tfp in tetrode_files:
-        run_kk(cfg, tfp)
+    # for tfp in tetrode_files:
+    params = [(cfg, tfp) for tfp in tetrode_files]
+    print(len(params))
 
+    results = pool.map_async(run_kk, params)
+
+    pool.close()
+    pool.join()
+
+    print(results)
 
 if __name__ == '__main__':
     import sys
