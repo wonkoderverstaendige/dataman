@@ -406,6 +406,7 @@ def main(args):
         images = dataman.lib.report.ds_shade_waveforms(waveforms, how=density_agg)
         fig = dataman.lib.report.ds_plot_waveforms(images, density_agg)
         report_string += report.fig2html(fig) + '</br>'
+        plt.close(fig)
         del fig
 
         # Tetrode Done!

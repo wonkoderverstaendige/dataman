@@ -375,6 +375,7 @@ def main(args):
                 images = ds_shade_waveforms(waveforms, how=density_agg)
             fig = ds_plot_waveforms(images, density_agg)
             frf.write(fig2html(fig) + '</br>')
+            plt.close(fig)
             del fig
 
             for fet_name, fet_data in features.items():
@@ -409,6 +410,7 @@ def main(args):
 
                 fet_fig = ds_plot_features(images, how='log', fet_titles=titles)
                 frf.write(fig2html(fet_fig) + '</br>\n')
+                plt.close(fig)
                 del fet_fig
 
                 # Features over time
@@ -433,6 +435,7 @@ def main(args):
 
                 t_fig = ds_plot_features(t_images, how='log', fet_titles=t_titles)
                 frf.write(fig2html(t_fig) + '</br>\n')
+                plt.close(fig)
                 del t_fig
 
                 frf.write('</hr>\n')
