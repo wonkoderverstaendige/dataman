@@ -107,7 +107,7 @@ def ds_shade_feature(fet_data, x_range=(-2, 8), y_range=(-2, 8),
         with np.errstate(invalid='ignore'):
             img = tf.shade(agg, how=how, cmap=cmap)
     except ZeroDivisionError:
-        logger.warning(f'Zero Division Error in ds_shade_feature for columns {tuple(fet_data.columns)}. Invalid plot.')
+        logger.debug(f'Zero Division Error in ds_shade_feature for columns {tuple(fet_data.columns)}. Invalid plot.')
         img = None
     return img
 
@@ -147,7 +147,7 @@ def ds_plot_features(shades, how, fet_titles, y_min=-500, y_max=400, plot_width=
         # cast rasterized shade into png image as workaround to false color application by imshow??
         # TODO: That can't be the best way to go about this!!
         if shades[n] is None:
-            logger.warning(f'ds_plot_feature received "None" datashader shades[{n}], replacing with zeros array.')
+            logger.debug(f'ds_plot_feature received "None" datashader shades[{n}], replacing with zeros array.')
             img_arr = np.zeros((400, 400, 3), dtype='uint8')
         else:
             img_arr = mpimg.imread(shades[n].to_bytesio('png'))

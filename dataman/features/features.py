@@ -11,7 +11,6 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from tqdm.auto import tqdm
 
-from dataman.lib.report import fig2html, ds_shade_waveforms, ds_plot_waveforms, ds_shade_feature, ds_plot_features
 from dataman.lib.util import run_prb
 
 PRECISION = np.dtype(np.single)
@@ -29,7 +28,7 @@ logging.getLogger('matplotlib.font_manager').disabled = True
 # Available features
 # TODO: per feature CLI arguments
 # TODO: feature discovery as modules
-AVAILABLE_FEATURES = ['energy', 'cpca', 'chwpca', 'position']
+AVAILABLE_FEATURES = ['energy', 'energy24', 'cpca', 'cpca24', 'chwpca']
 
 
 def scale_feature(fet):
@@ -63,7 +62,7 @@ def feature_energy(wv):
 def feature_energy24(wv):
     """Calculate l2 (euclidean) norm for vector containing spike waveforms for the first 24 samples
     """
-    return np.sqrt(np.sum(wv[:24, :, :] ** 2, axis=0)).T
+    return np.sqrt(np.sum(wv[2:22, :, :] ** 2, axis=0)).T
 
 
 def feature_weighted_energy(wv, dropoff=.1, s_pre=8, s_post=16):
@@ -75,40 +74,40 @@ def feature_weighted_energy(wv, dropoff=.1, s_pre=8, s_post=16):
 
 def feature_position(pos_file, dat_offsets, timestamps, indices, sampling_rate=3e4):
     raise NotImplemented('This feature has not been implemented yet.')
-    pos_f = h5py.File(pos_file, 'r')
-    positions = np.array(pos_f['XY_data']).T
-    av_pos = (np.nanmax(positions) - np.nanmin(positions)) / 2
-
-    n_frames = len(positions)
-    n_records = [(nb - 1024) / 2070 for nb in n_bytes]
-    assert not any([nr % 1 for nr in n_records])
-    n_samples = [int(nr * 1024) for nr in n_records]
-
-    starts = [sum(n_samples[:n]) for n in range(len(n_samples))]
-    s_duration = [ns / sampling_rate for ns in n_samples]
-    fps = n_frames / s_duration[1]
-
-    idx_vid_start = np.nonzero(indices > starts[1])[0].min()
-    idx_vid_end = np.nonzero(indices > starts[2])[0].min() - 1
-
-    t_pos = np.zeros(len(timestamps))
-    t_vel = np.zeros_like(t_pos)
-    t_acc = np.zeros_like(t_pos)
-
-    t_pos[np.squeeze(timestamps) < starts[1] / 3] = -1
-    t_pos[np.squeeze(timestamps) > starts[2] / 3] = -1
-
-    for idx in range(idx_vid_start, idx_vid_end):
-        vid_index = int((indices[idx] - n_samples[0]) * fps // sampling_rate)
-
-        t_pos[idx] = positions[vid_index]
-
-    # fill nans by interpolation
-
-    t_vel[1:] = np.diff(t_pos)
-    t_acc[1:] = np.diff(t_vel)
-
-    return np.vstack([t_pos, t_pos, t_vel, t_acc]).T
+    # pos_f = h5py.File(pos_file, 'r')
+    # positions = np.array(pos_f['XY_data']).T
+    # av_pos = (np.nanmax(positions) - np.nanmin(positions)) / 2
+    #
+    # n_frames = len(positions)
+    # n_records = [(nb - 1024) / 2070 for nb in n_bytes]
+    # assert not any([nr % 1 for nr in n_records])
+    # n_samples = [int(nr * 1024) for nr in n_records]
+    #
+    # starts = [sum(n_samples[:n]) for n in range(len(n_samples))]
+    # s_duration = [ns / sampling_rate for ns in n_samples]
+    # fps = n_frames / s_duration[1]
+    #
+    # idx_vid_start = np.nonzero(indices > starts[1])[0].min()
+    # idx_vid_end = np.nonzero(indices > starts[2])[0].min() - 1
+    #
+    # t_pos = np.zeros(len(timestamps))
+    # t_vel = np.zeros_like(t_pos)
+    # t_acc = np.zeros_like(t_pos)
+    #
+    # t_pos[np.squeeze(timestamps) < starts[1] / 3] = -1
+    # t_pos[np.squeeze(timestamps) > starts[2] / 3] = -1
+    #
+    # for idx in range(idx_vid_start, idx_vid_end):
+    #     vid_index = int((indices[idx] - n_samples[0]) * fps // sampling_rate)
+    #
+    #     t_pos[idx] = positions[vid_index]
+    #
+    # # fill nans by interpolation
+    #
+    # t_vel[1:] = np.diff(t_pos)
+    # t_acc[1:] = np.diff(t_vel)
+    #
+    # return np.vstack([t_pos, t_pos, t_vel, t_acc]).T
 
 
 def feature_cPCA(wv, n_components=12, incremental=False, batch_size=None):
@@ -171,7 +170,7 @@ def feature_chwPCA(wv, dims=3, energy_normalize=True):
 def write_features_fet(feature_data, outpath):
     # TODO: Channel validity
     start = time.time()
-    fet_data = np.hstack(list(feature_data))
+    fet_data = np.hstack([fd[0] for fd in feature_data])
     logger.debug('hstack fet data in {:.2f} s'.format(time.time() - start))
     logging.info("fet_data is {} MB, shape: {}".format(fet_data.nbytes / 1e6, fet_data.shape))
 
@@ -180,17 +179,18 @@ def write_features_fet(feature_data, outpath):
         fet_file.write(f' {fet_data.shape[1]}\n')
 
         np.savetxt(fet_file, fet_data, fmt='%-16.8f', delimiter=' ')
-    logger.debug('Wrote fet file in {:.2f} s'.format(time.time() - start))
+    logger.debug('Wrote fet file in {:.2f} s'.format(time.time() - start))\
 
-    # # faster variant, but only saves ~7 seconds/1M spikes @ 32 features
-    # start = time.time()
-    # with open(outpath.with_suffix('.test'), 'w') as fet_file:
-    #     fet_file.write(f' {fet_data.shape[1]}\n')
-    #     fmt = ' '.join(['%g'] * fet_data.shape[1])
-    #     fmt = '\n'.join([fmt] * fet_data.shape[0])
-    #     fet_string = fmt % tuple(fet_data.ravel())
-    #     fet_file.write(fet_string)
-    # logger.debug('VARIANT: Wrote fet file in {:.2f} s'.format(time.time() - start))
+    # Write feature validity
+    validities = [str(v) for fd in feature_data for v in fd[1]]
+    print(validities)
+
+    validity_file_path = outpath.with_suffix('.validity')
+    logging.debug(f'Channel validity for {validity_file_path}: {validities}')
+
+    with open(validity_file_path, 'w') as validity_file:
+        validity_file.write(''.join(validities))
+    logger.debug(f'Wrote channel validity file {validity_file_path}.')
 
 
 def write_feature_fd(feature_names, feature_data, timestamps, outpath, tetrode_path, channel_validity=None):
@@ -227,13 +227,13 @@ def main(args):
     parser = argparse.ArgumentParser('Generate .fet and .fd files for features from spike waveforms')
     parser.add_argument('-v', '--verbose', action='store_true', help="Verbose (debug) output")
 
-    parser.add_argument('target', default='.', help="""Directory with waveform .mat files.""")
+    parser.add_argument('target', help="""Directory with waveform .mat files.""")
     parser.add_argument('-o', '--out_path', help='Output file path Defaults to current working directory')
     parser.add_argument('--sampling-rate', type=float, help='Sampling rate. Default 30000 Hz', default=3e4)
     parser.add_argument('-f', '--force', action='store_true', help='Force overwrite of existing files.')
     parser.add_argument('-a', '--align', help='Alignment method, default: min', default='min')
     parser.add_argument('-F', '--features', nargs='*', help='Features to use. Default: energy', default=['energy'])
-    parser.add_argument('--to_fet', nargs='*', help='Features to include in fet file, default: all')
+    parser.add_argument('--to_fet', nargs='*', help='Features to include in fet file, default: all', default='energy')
     parser.add_argument('--ignore-prb', action='store_true',
                         help='Do not load channel validity from dead channels in .prb files')
     parser.add_argument('--no-report', action='store_true', help='Do not generate report file (saves time)')
@@ -245,9 +245,17 @@ def main(args):
     else:
         matfiles = sorted(list(map(Path.resolve, matpath.glob('tetrode??.mat'))))
 
-    logger.debug([mf.name for mf in matfiles])
-    logger.info('Found {} waveform files'.format(len(matfiles)))
+    if not len(matfiles):
+        logging.error('No target files found.')
+        return
 
+    logger.debug(f'Target files: {[mf.name for mf in matfiles]}')
+    logger.info('Found {} waveform files'.format(len(matfiles)))
+    logger.debug(f'Requested to fet: {cli_args.to_fet}')
+
+    # Late-load reporting library.
+    # Without, just requesting the help takes forever due to datashader, dask and numba
+    from dataman.lib.report import fig2html, ds_shade_waveforms, ds_plot_waveforms, ds_shade_feature, ds_plot_features
     # TODO:
     # per feature arguments
 
@@ -261,52 +269,63 @@ def main(args):
         if prb_path.exists():
             prb = run_prb(prb_path)
         else:
-            logger.warning(f'No probe file found for {matfile} and no channel validity given.')
+            logger.warning(f'No probe file found for {matfile.name} and no channel validity given.')
             prb = None
         if prb is None or 'dead_channels' not in prb:
             channel_validity = [1, 1, 1, 1]
         else:
             channel_validity = [int(ch not in prb['dead_channels']) for ch in prb['channel_groups'][0]['channels']]
-        logger.debug('channel validity: {}'.format(channel_validity) + ('' if all(
+        logger.debug('Channel validity: {}'.format(channel_validity) + ('' if all(
             channel_validity) else f', {4 - sum(channel_validity)} dead channel(s)'))
 
         hf = h5py.File(matfile, 'r')
-        waveforms = np.array(hf['spikes'], dtype=PRECISION).reshape(N_SAMPLES, N_CHANNELS, -1)
+        waveforms = np.array(hf['spikes'], dtype=PRECISION).reshape([N_SAMPLES, N_CHANNELS, -1])
 
         timestamps = np.array(hf['index'], dtype='double')
         # indices = timestamps * sampling_rate / 1e4
 
         features = {}
+        validities = {}
+        # Allow to calculate all available features
+        if len(cli_args.features) == 1 and cli_args.features[0].lower() == 'all':
+            cli_args.features = AVAILABLE_FEATURES
+
         for fet_name in map(str.lower, cli_args.features):
             if fet_name == 'energy':
                 logger.debug(f'Calculating {fet_name} feature')
-                features['energy'] = scale_feature(feature_energy(waveforms))
+                features[fet_name] = scale_feature(feature_energy(waveforms))
+                validities[fet_name] = channel_validity
 
             elif fet_name == 'energy24':
                 logger.debug(f'Calculating {fet_name} feature')
                 features['energy24'] = scale_feature(feature_energy24(waveforms))
+                validities[fet_name] = channel_validity
 
             elif fet_name == 'peak':
                 logger.debug(f'Calculating {fet_name} feature')
                 features['peak'] = feature_peak(waveforms)
+                validities[fet_name] = channel_validity
 
             elif fet_name == 'cpca':
                 logging.debug(f'Calculating {fet_name} feature')
                 cpca = scale_feature(feature_cPCA(waveforms))
                 logger.debug('cPCA shape {}'.format(cpca.shape))
                 features['cPCA'] = cpca
+                validities['cPCA'] = [1] * features['cPCA'].shape[1]
 
             elif fet_name == 'cpca24':
                 logging.debug(f'Calculating {fet_name} feature')
                 cpca24 = scale_feature(feature_cPCA24(waveforms))
                 logger.debug('cPCA24 shape {}'.format(cpca24.shape))
                 features['cPCA24'] = cpca24
+                validities['cPCA24'] = [1] * features['cPCA24'].shape[1]
 
             elif fet_name == 'chwpca':
                 logging.debug(f'Calculating {fet_name} feature')
                 chwpca = scale_feature(feature_chwPCA(waveforms))
                 logger.debug('chwPCA shape {}'.format(chwpca.shape))
                 features['chwPCA'] = chwpca
+                validities['chwPCA'] = [1] * features['chwPCA'].shape[1]
 
             else:
                 raise NotImplementedError("Unknonw feature: {}".format(fet_name))
@@ -319,23 +338,32 @@ def main(args):
         # fet_pos = feature_position(matpath / 'XY_data.mat', dat_offsets=n_bytes, timestamps=timestamps,
         #                            indices=indices)
 
-        if len(cli_args.to_fet) == 1 is not None and cli_args.to_fet[0].lower() == 'none':
+        # Generate .fet file used for clustering
+        # TODO: Best move this out into the cluster module?
+        if 'none' in map(str.lower, cli_args.to_fet):
             logger.warning('Skipping fet file generation')
         else:
             fet_file_path = outpath / matfile.with_suffix('.fet.0').name
-            logger.debug(f'Writing .fet file {fet_file_path}')
-            if cli_args is None:
+
+            if len(cli_args.to_fet) == 1 and cli_args.to_fet[0].lower() == 'all':
                 logger.debug('Writing all features to fet file.')
+                included_features = list(map(str.lower, features.keys()))
             else:
-                logger.debug('Only writing fetures {} to fet file'.format(cli_args.to_fet))
-            fet_data = [fd for fn, fd in features.items() if (fn.lower() in cli_args.to_fet) or not cli_args.to_fet]
+                included_features = [fn for fn in map(str.lower, features.keys()) if
+                                     fn in list(map(str.lower, cli_args.to_fet))]
+
+            logger.info(f'Writing features {list(included_features)} to .fet')
+            fet_data = [(fd, validities[fn]) for fn, fd in features.items() if fn.lower() in included_features]
+
+
+            logger.debug(f'Writing .fet file {fet_file_path}')
             write_features_fet(feature_data=fet_data, outpath=fet_file_path)
 
-            logger.debug('Writing feature .fd files')
-            for fet_name, fet_data in features.items():
-                write_feature_fd(feature_names=fet_name, feature_data=fet_data,
-                                 timestamps=timestamps, outpath=outpath, tetrode_path=matfile,
-                                 channel_validity=channel_validity)
+        # Write .fd file for each feature
+        for fet_name, fet_data in features.items():
+            logger.debug(f'Writing feature {fet_name}.fd file')
+            write_feature_fd(feature_names=fet_name, feature_data=fet_data,
+                             timestamps=timestamps, outpath=outpath, tetrode_path=matfile)
 
         logger.debug('Generating waveform graphic')
         with open(matfile.with_suffix('.html'), 'w') as frf:
@@ -414,5 +442,5 @@ def main(args):
 
 if __name__ == '__main__':
     import sys
-    main(sys.argv[1:])
 
+    main(sys.argv[1:])
