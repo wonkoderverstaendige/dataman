@@ -1,27 +1,18 @@
-# generate .fet file from .fd files
-#           OR
-# if those features are missing, generate them with dm features!
-# - generate/load features
-# - run klustakwik
-# - read clusters, build initial clustering report
 import argparse
 import logging
 import shutil
-from pathlib import Path
+import subprocess
 from itertools import combinations
+from pathlib import Path
 
+import datashader as ds  # slow to import, takes ~4 s
+import hdf5storage as h5s
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import pkg_resources
 import yaml
-import subprocess
-
-import platform
-
-import pandas as pd
-import datashader as ds  # slow to import, takes ~4 s
 from datashader import transfer_functions as ds_tf
-import numpy as np
-import matplotlib.pyplot as plt
-import hdf5storage as h5s
 
 from dataman.lib.report import fig2html, ds_plot_features
 
@@ -38,6 +29,7 @@ def load_yaml(yaml_path):
     with open(yaml_path, 'r') as yf:
         return yaml.load(yf, Loader=yaml.SafeLoader) or {}
 
+
 def run_kk(params, run_kk=True):
     cfg, target_path = params
     tt_fname = target_path.name
@@ -49,7 +41,6 @@ def run_kk(params, run_kk=True):
     if clu_file.exists() and cfg['skip']:
         logging.error(f'Clu file {clu_file} exists. Skipping.')
         run_kk = False
-
 
     # Read in feature validity
     validity_path = target_path.with_suffix('.validity')
@@ -157,6 +148,7 @@ def run_kk(params, run_kk=True):
             crf.write(fig2html(fet_fig) + '</br>\n')
             plt.close(fet_fig)
 
+
 def main(args):
     parser = argparse.ArgumentParser('Clustering with KlustaKwik')
     parser.add_argument('target', help='Target path, either path containing tetrode files, or single tetrodeXX.mat')
@@ -165,6 +157,9 @@ def main(args):
     parser.add_argument('--config', help='Path to configuration file')
     parser.add_argument('--skip', help='Skip if clu file exists already', action='store_true')
     parser.add_argument('--no_spread', help='Shade report plots without static spread', action='store_true')
+    parser.add_argument('-N', '--num_proc',
+                        help='Number of KlustaKwik instances to run in parallel, defaults to 0 (all)', type=int,
+                        default=0)
     cli_args = parser.parse_args(args)
 
     # Load default configuration yaml file
@@ -216,7 +211,8 @@ def main(args):
     logger.debug(f'Targets found: {tetrode_files}')
 
     from multiprocessing.pool import ThreadPool
-    pool = ThreadPool(processes=4)
+    num_procs = cli_args.num_proc if cli_args.num_proc > 0 else len(tetrode_files)
+    pool = ThreadPool(processes=num_procs)
 
     # for tfp in tetrode_files:
     params = [(cfg, tfp) for tfp in tetrode_files]
@@ -228,6 +224,7 @@ def main(args):
     pool.join()
 
     print(results)
+
 
 if __name__ == '__main__':
     import sys
