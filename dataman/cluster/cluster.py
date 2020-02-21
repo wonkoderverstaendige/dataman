@@ -38,96 +38,30 @@ def load_yaml(yaml_path):
     with open(yaml_path, 'r') as yf:
         return yaml.load(yf, Loader=yaml.SafeLoader) or {}
 
+def run_kk(cfg, target_path, run_kk=True):
+    tt_fname = target_path.name
+    tetrode_file_stem = tt_fname.split(".")[0]
+    tetrode_file_elecno = tt_fname.split(".")[-1]
+    working_dir = target_path.parent
+    logging.debug(f'Tetrode name: {tt_fname}, stem: {tetrode_file_stem}, ElecNo: {tetrode_file_elecno}')
+    clu_file = working_dir / (tetrode_file_stem + f'.clu.{tetrode_file_elecno}')
+    if clu_file.exists() and cfg['skip']:
+        logging.error(f'Clu file {clu_file} exists. Skipping.')
+        run_kk = False
 
-def main(args):
-    parser = argparse.ArgumentParser('Clustering with KlustaKwik')
-    parser.add_argument('target', help='Target path, either path containing tetrode files, or single tetrodeXX.mat')
-    parser.add_argument('--KK', help='Path to KlustaKwik executable')
-    parser.add_argument('--features', nargs='*', help='list of features to use for clustering')
-    parser.add_argument('--config', help='Path to configuration file')
-    parser.add_argument('--cluster', action='store_true', help='Directly run ')
-    parser.add_argument('--force', help='Overwrite existing files.', action='store_true')
-    parser.add_argument('--skip', help='Skip if clu file exists already', action='store_true')
-    parser.add_argument('--no_spread', help='Shade report plots without static spread', action='store_true')
-    cli_args = parser.parse_args(args)
 
-    # Load default configuration yaml file
-    default_cfg_path = Path(pkg_resources.resource_filename(__name__, '../resources/cluster_defaults.yml')).resolve()
-    if not default_cfg_path.exists():
-        logging.error('Could not find default config file.')
-        raise FileNotFoundError
-    logger.debug('Loading default configuration')
-    cfg = load_yaml(default_cfg_path)
+    # Read in feature validity
+    validity_path = target_path.with_suffix('.validity')
+    if not validity_path.exists():
+        logger.warning('No explicit feature validity given, falling back to default = all used.')
+    with open(validity_path) as vfp:
+        validity_string = vfp.readline()
+    logger.debug(f'Channel validity: {validity_string}')
+    validities = [int(val) for val in validity_string]
 
-    # Load local config file if it exists
-    local_cfg_path = Path(
-        pkg_resources.resource_filename(__name__, '../resources/cluster_defaults_local.yml')).resolve()
-    if local_cfg_path.exists():
-        logger.debug('Loading and updating with local configuration')
-        local_cfg = load_yaml(local_cfg_path)
-        cfg.update(local_cfg)
-
-    # Load custom config path
-    custom_cfg_path = Path(cli_args.config).resolve() if cli_args.config else None
-    if custom_cfg_path:
-        if custom_cfg_path.exists():
-            logger.debug('Loading and updating with custom configuration')
-            cfg.update(load_yaml(custom_cfg_path))
-        else:
-            raise FileNotFoundError(f"Could not load configuration file {custom_cfg_path}")
-
-    # Load parameters from command line
-    logger.debug('Parsing and updating configuration with CLI arguments')
-    cfg.update(vars(cli_args))
-    logger.debug(cfg)
-
-    # try to find Klustakwik executable if necessary...
-    if cli_args.KK is None:
-        cli_args.KK = shutil.which('KlustaKwik') or shutil.which('klustakwik') or shutil.which('Klustakwik')
-    if cli_args.KK is None and cli_args.cluster:
-        raise FileNotFoundError('Could not find the KlustaKwik executable on the path, and none given.')
-
-    # # Building KlustaKwik Command
-    # # 1) Find KlustaKwik executable
-    # mclust_path = Path('C:/Users/reichler/src/MClustPipeline/MClust/KlustaKwik')
-    # pf_system = platform.system()
-    # logger.debug(f'Platform: {pf_system}')
-    # if pf_system == 'Linux':
-    #     kk_executable = mclust_path / cfg['KLUSTAKWIK_PATH_LINUX']
-    # elif pf_system == 'Windows':
-    #     kk_executable = mclust_path / cfg['KLUSTAKWIK_PATH_WINDOWS']
-    # else:
-    #     raise NotImplemented(f'No KlustaKwik executable defined for platform {pf_system}')
-    # logger.debug(kk_executable)
-
-    kk_executable = cli_args.KK
-
-    # 2) Find target file stem
-    working_dir = Path(cli_args.target).resolve()
-    if working_dir.is_file() and working_dir.exists():
-        tetrode_files = [working_dir.name]
-        working_dir = working_dir.parent
-        logger.debug(f'Using single file mode with {str(tetrode_files[0])}')
-    else:
-        tetrode_files = sorted([tf.name for tf in working_dir.glob(cfg['TARGET_FILE_GLOB'])])
-
-    logger.debug(f'Working dir: {working_dir}')
-
-    # No parallel/serial execution supported right now
-    if len(tetrode_files) > 1:
-        raise NotImplemented('Currently only one target file per call supported!')
-    logger.debug(f'Target found: {tetrode_files}')
-
-    tetrode_file_stem = str(tetrode_files[0]).split(".")[0]
-    tetrode_file_elecno = tetrode_files[0].split(".")[-1]
-
-    # 3) Check if output file already exists
-    clu_file = (working_dir / tetrode_file_stem).with_suffix(f'.clu.{tetrode_file_elecno}')
-    if clu_file.exists() and not (cli_args.force or cli_args.skip):
-        raise FileExistsError('Clu file already exists. Use --force to overwrite.')
-
-    # 4) combine executable and arguments
-    kk_cmd = f'{kk_executable} {tetrode_file_stem} -ElecNo {tetrode_file_elecno}'
+    # Combine executable and arguments
+    kk_executable = cfg["kk_executable"]
+    kk_cmd = f'{kk_executable} {tetrode_file_stem} -ElecNo {tetrode_file_elecno} -UseFeatures {validity_string}'
     kk_cmd_list = kk_cmd.split(' ')
     logger.debug(f'KK COMMAND: {kk_cmd}')
     logger.debug(f'KK COMMAND LIST: {kk_cmd_list}')
@@ -136,18 +70,17 @@ def main(args):
     # TODO: Use communicate to interact with KK, i.e. write to log and monitor progress
     #       see https://stackoverflow.com/questions/21953835/run-subprocess-and-print-output-to-logging
     logger.info('Starting KlustaKwik process')
-
     if cfg['PRINT_KK_OUTPUT']:
         stdout = None
     else:
         stdout = subprocess.PIPE
 
-    # EXECUTE KLUSTAKWIK
-    if not clu_file.exists() or cli_args.force:
+    if run_kk:
         kk_call = subprocess.run(kk_cmd_list, stderr=subprocess.STDOUT, stdout=stdout)
         kk_error = kk_call.returncode
 
         logger.debug('Writing KlustaKwik log file')
+        logger.debug('Clu File: ' + str(clu_file))
         if kk_call.stdout is not None:
             with open(clu_file.with_suffix('.log'), 'w') as log_file:
                 log_file.write(kk_call.stdout.decode('ascii'))
@@ -203,23 +136,91 @@ def main(args):
             images = []
             titles = []
             for cc in combinations(map(str, range(len(fd_df.columns) - 1)), r=2):
-                fet_title = f'{fet_name}:{cc[1]} vs {fet_name}:{cc[0]}'
+                fet_title = f'x: {fet_name}:{cc[0]} vs y: {fet_name}:{cc[1]}'
                 x_range = (np.percentile(fd_df[cc[0]], 0.01), np.percentile(fd_df[cc[0]], 99.9))
                 y_range = (np.percentile(fd_df[cc[1]], 0.01), np.percentile(fd_df[cc[1]], 99.9))
 
                 logger.debug(f'shading {len(fd_df)} points in {fd_df.shape[1] - 1} dimensions')
                 canvas = ds.Canvas(plot_width=300, plot_height=300, x_range=x_range, y_range=y_range)
-                agg = canvas.points(fd_df, x=cc[0], y=cc[1], agg=ds.count_cat('clu_id'))
-                with np.errstate(invalid='ignore'):
-                    img = ds_tf.shade(agg, how='log', color_key=color_keys)
-                    img = img if cli_args.no_spread else ds_tf.spread(img, px=1)
-                    images.append(img)
+                try:
+                    agg = canvas.points(fd_df, x=cc[0], y=cc[1], agg=ds.count_cat('clu_id'))
+                    with np.errstate(invalid='ignore'):
+                        img = ds_tf.shade(agg, how='log', color_key=color_keys)
+                        img = img if cfg['no_spread'] else ds_tf.spread(img, px=1)
+                except ZeroDivisionError:
+                    img = None
+                images.append(img)
                 titles.append(fet_title)
 
             logger.debug(f'Creating plot for {fet_name}')
             fet_fig = ds_plot_features(images, how='log', fet_titles=titles)
             crf.write(fig2html(fet_fig) + '</br>\n')
             plt.close(fet_fig)
+
+def main(args):
+    parser = argparse.ArgumentParser('Clustering with KlustaKwik')
+    parser.add_argument('target', help='Target path, either path containing tetrode files, or single tetrodeXX.mat')
+    parser.add_argument('--KK', help='Path to KlustaKwik executable')
+    parser.add_argument('--features', nargs='*', help='list of features to use for clustering')
+    parser.add_argument('--config', help='Path to configuration file')
+    parser.add_argument('--skip', help='Skip if clu file exists already', action='store_true')
+    parser.add_argument('--no_spread', help='Shade report plots without static spread', action='store_true')
+    cli_args = parser.parse_args(args)
+
+    # Load default configuration yaml file
+    default_cfg_path = Path(pkg_resources.resource_filename(__name__, '../resources/cluster_defaults.yml')).resolve()
+    if not default_cfg_path.exists():
+        logging.error('Could not find default config file.')
+        raise FileNotFoundError
+    logger.debug('Loading default configuration')
+    cfg = load_yaml(default_cfg_path)
+
+    # Load local config file if it exists
+    local_cfg_path = Path(
+        pkg_resources.resource_filename(__name__, '../resources/cluster_defaults_local.yml')).resolve()
+    if local_cfg_path.exists():
+        logger.debug('Loading and updating with local configuration')
+        local_cfg = load_yaml(local_cfg_path)
+        cfg.update(local_cfg)
+
+    # Load custom config path
+    custom_cfg_path = Path(cli_args.config).resolve() if cli_args.config else None
+    if custom_cfg_path:
+        if custom_cfg_path.exists():
+            logger.debug('Loading and updating with custom configuration')
+            cfg.update(load_yaml(custom_cfg_path))
+        else:
+            raise FileNotFoundError(f"Could not load configuration file {custom_cfg_path}")
+
+    # Load parameters from command line
+    logger.debug('Parsing and updating configuration with CLI arguments')
+    cfg.update(vars(cli_args))
+
+    # try to find KlustaKwik executable if necessary...
+    if cli_args.KK is None:
+        cli_args.KK = shutil.which('KlustaKwik') or shutil.which('klustakwik') or shutil.which('Klustakwik')
+    if cli_args.KK is None:
+        raise FileNotFoundError('Could not find the KlustaKwik executable on the path, and none given.')
+
+    cfg['kk_executable'] = cli_args.KK
+
+    logger.debug(cfg)
+
+    # 1) Find target file stem
+    target_path = Path(cli_args.target).resolve()
+    if target_path.is_file():
+        tetrode_files = [target_path]
+        logger.debug(f'Using single file mode with {str(tetrode_files)}')
+    else:
+        tetrode_files = sorted([tf.resolve() for tf in target_path.glob(cfg['TARGET_FILE_GLOB'])])
+    logger.debug(f'Targets found: {tetrode_files}')
+
+    # No parallel/serial execution supported right now
+    if len(tetrode_files) > 1:
+        raise NotImplemented('Currently only one target file per call supported!')
+
+    for tfp in tetrode_files:
+        run_kk(cfg, tfp)
 
 
 if __name__ == '__main__':

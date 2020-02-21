@@ -11,7 +11,6 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from tqdm.auto import tqdm
 
-from dataman.lib.report import fig2html, ds_shade_waveforms, ds_plot_waveforms, ds_shade_feature, ds_plot_features
 from dataman.lib.util import run_prb
 
 PRECISION = np.dtype(np.single)
@@ -171,7 +170,7 @@ def feature_chwPCA(wv, dims=3, energy_normalize=True):
 def write_features_fet(feature_data, outpath):
     # TODO: Channel validity
     start = time.time()
-    fet_data = np.hstack(list(feature_data))
+    fet_data = np.hstack([fd[0] for fd in feature_data])
     logger.debug('hstack fet data in {:.2f} s'.format(time.time() - start))
     logging.info("fet_data is {} MB, shape: {}".format(fet_data.nbytes / 1e6, fet_data.shape))
 
@@ -180,17 +179,18 @@ def write_features_fet(feature_data, outpath):
         fet_file.write(f' {fet_data.shape[1]}\n')
 
         np.savetxt(fet_file, fet_data, fmt='%-16.8f', delimiter=' ')
-    logger.debug('Wrote fet file in {:.2f} s'.format(time.time() - start))
+    logger.debug('Wrote fet file in {:.2f} s'.format(time.time() - start))\
 
-    # # faster variant, but only saves ~7 seconds/1M spikes @ 32 features
-    # start = time.time()
-    # with open(outpath.with_suffix('.test'), 'w') as fet_file:
-    #     fet_file.write(f' {fet_data.shape[1]}\n')
-    #     fmt = ' '.join(['%g'] * fet_data.shape[1])
-    #     fmt = '\n'.join([fmt] * fet_data.shape[0])
-    #     fet_string = fmt % tuple(fet_data.ravel())
-    #     fet_file.write(fet_string)
-    # logger.debug('VARIANT: Wrote fet file in {:.2f} s'.format(time.time() - start))
+    # Write feature validity
+    validities = [str(v) for fd in feature_data for v in fd[1]]
+    print(validities)
+
+    validity_file_path = outpath.with_suffix('.validity')
+    logging.debug(f'Channel validity for {validity_file_path}: {validities}')
+
+    with open(validity_file_path, 'w') as validity_file:
+        validity_file.write(''.join(validities))
+    logger.debug(f'Wrote channel validity file {validity_file_path}.')
 
 
 def write_feature_fd(feature_names, feature_data, timestamps, outpath, tetrode_path, channel_validity=None):
@@ -227,13 +227,13 @@ def main(args):
     parser = argparse.ArgumentParser('Generate .fet and .fd files for features from spike waveforms')
     parser.add_argument('-v', '--verbose', action='store_true', help="Verbose (debug) output")
 
-    parser.add_argument('target', default='.', help="""Directory with waveform .mat files.""")
+    parser.add_argument('target', help="""Directory with waveform .mat files.""")
     parser.add_argument('-o', '--out_path', help='Output file path Defaults to current working directory')
     parser.add_argument('--sampling-rate', type=float, help='Sampling rate. Default 30000 Hz', default=3e4)
     parser.add_argument('-f', '--force', action='store_true', help='Force overwrite of existing files.')
     parser.add_argument('-a', '--align', help='Alignment method, default: min', default='min')
     parser.add_argument('-F', '--features', nargs='*', help='Features to use. Default: energy', default=['energy'])
-    parser.add_argument('--to_fet', nargs='*', help='Features to include in fet file, default: all', default='all')
+    parser.add_argument('--to_fet', nargs='*', help='Features to include in fet file, default: all', default='energy')
     parser.add_argument('--ignore-prb', action='store_true',
                         help='Do not load channel validity from dead channels in .prb files')
     parser.add_argument('--no-report', action='store_true', help='Do not generate report file (saves time)')
@@ -245,10 +245,17 @@ def main(args):
     else:
         matfiles = sorted(list(map(Path.resolve, matpath.glob('tetrode??.mat'))))
 
+    if not len(matfiles):
+        logging.error('No target files found.')
+        return
+
     logger.debug(f'Target files: {[mf.name for mf in matfiles]}')
     logger.info('Found {} waveform files'.format(len(matfiles)))
     logger.debug(f'Requested to fet: {cli_args.to_fet}')
 
+    # Late-load reporting library.
+    # Without, just requesting the help takes forever due to datashader, dask and numba
+    from dataman.lib.report import fig2html, ds_shade_waveforms, ds_plot_waveforms, ds_shade_feature, ds_plot_features
     # TODO:
     # per feature arguments
 
@@ -278,6 +285,7 @@ def main(args):
         # indices = timestamps * sampling_rate / 1e4
 
         features = {}
+        validities = {}
         # Allow to calculate all available features
         if len(cli_args.features) == 1 and cli_args.features[0].lower() == 'all':
             cli_args.features = AVAILABLE_FEATURES
@@ -285,33 +293,39 @@ def main(args):
         for fet_name in map(str.lower, cli_args.features):
             if fet_name == 'energy':
                 logger.debug(f'Calculating {fet_name} feature')
-                features['energy'] = scale_feature(feature_energy(waveforms))
+                features[fet_name] = scale_feature(feature_energy(waveforms))
+                validities[fet_name] = channel_validity
 
             elif fet_name == 'energy24':
                 logger.debug(f'Calculating {fet_name} feature')
                 features['energy24'] = scale_feature(feature_energy24(waveforms))
+                validities[fet_name] = channel_validity
 
             elif fet_name == 'peak':
                 logger.debug(f'Calculating {fet_name} feature')
                 features['peak'] = feature_peak(waveforms)
+                validities[fet_name] = channel_validity
 
             elif fet_name == 'cpca':
                 logging.debug(f'Calculating {fet_name} feature')
                 cpca = scale_feature(feature_cPCA(waveforms))
                 logger.debug('cPCA shape {}'.format(cpca.shape))
                 features['cPCA'] = cpca
+                validities['cPCA'] = [1] * features['cPCA'].shape[1]
 
             elif fet_name == 'cpca24':
                 logging.debug(f'Calculating {fet_name} feature')
                 cpca24 = scale_feature(feature_cPCA24(waveforms))
                 logger.debug('cPCA24 shape {}'.format(cpca24.shape))
                 features['cPCA24'] = cpca24
+                validities['cPCA24'] = [1] * features['cPCA24'].shape[1]
 
             elif fet_name == 'chwpca':
                 logging.debug(f'Calculating {fet_name} feature')
                 chwpca = scale_feature(feature_chwPCA(waveforms))
                 logger.debug('chwPCA shape {}'.format(chwpca.shape))
                 features['chwPCA'] = chwpca
+                validities['chwPCA'] = [1] * features['chwPCA'].shape[1]
 
             else:
                 raise NotImplementedError("Unknonw feature: {}".format(fet_name))
@@ -339,7 +353,8 @@ def main(args):
                                      fn in list(map(str.lower, cli_args.to_fet))]
 
             logger.info(f'Writing features {list(included_features)} to .fet')
-            fet_data = [fd for fn, fd in features.items() if fn.lower() in included_features]
+            fet_data = [(fd, validities[fn]) for fn, fd in features.items() if fn.lower() in included_features]
+
 
             logger.debug(f'Writing .fet file {fet_file_path}')
             write_features_fet(feature_data=fet_data, outpath=fet_file_path)
@@ -348,8 +363,7 @@ def main(args):
         for fet_name, fet_data in features.items():
             logger.debug(f'Writing feature {fet_name}.fd file')
             write_feature_fd(feature_names=fet_name, feature_data=fet_data,
-                             timestamps=timestamps, outpath=outpath, tetrode_path=matfile,
-                             channel_validity=channel_validity)
+                             timestamps=timestamps, outpath=outpath, tetrode_path=matfile)
 
         logger.debug('Generating waveform graphic')
         with open(matfile.with_suffix('.html'), 'w') as frf:
