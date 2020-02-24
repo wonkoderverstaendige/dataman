@@ -384,8 +384,8 @@ def main(args):
 
         thr = noise_perc * stddev_factor
         for ch in range(4):
-            info_line = f'<b>Channel {ch}:</b> Thr {thr[ch]:.1f} = {noise_perc[ch]:.1f} uV * {stddev_factor:.2f}' \
-                        f'({noise_percentile:}th percentile:, min: {ne_min[ch]:.1f}, max: {ne_max[ch]:.1f},' \
+            info_line = f'<b>Channel {ch}:</b> Thr {thr[ch]:.1f} = {noise_perc[ch]:.1f} uV * {stddev_factor:.1f} nSD' \
+                        f' ({noise_percentile:}th NE percentile, min: {ne_min[ch]:.1f}, max: {ne_max[ch]:.1f},' \
                         f'std: {ne_std[ch]:.1f})</br>'
             report_string += info_line
 
