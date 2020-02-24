@@ -384,9 +384,10 @@ def main(args):
 
         thr = noise_perc * stddev_factor
         for ch in range(4):
-            info_line = '<b>Channel {}:</b>, Threshold: {:.1f}, 5th percentile: {:.1f} ' \
-                        'uV (min: {:.1f}, max: {:.1f}, std: {:.1f})'
-            report_string += info_line.format(ch, thr[ch], noise_perc[ch], ne_min[ch], ne_max[ch], ne_std[ch]) + '<br>'
+            info_line = f'<b>Channel {ch}:</b> Thr {thr[ch]:.1f} = {noise_perc[ch]:.1f} uV * {stddev_factor:.2f}' \
+                        f'({noise_percentile:}th percentile:, min: {ne_min[ch]:.1f}, max: {ne_max[ch]:.1f},' \
+                        f'std: {ne_std[ch]:.1f})</br>'
+            report_string += info_line
 
         # Spike Timestamp Detection ##################################################
         report_string += '<h2>Spike Detection</h2>'
