@@ -37,7 +37,8 @@ def plot_noise(noise_arr, thresholds, tetrode=None):
 
     t = np.linspace(0, len(noise_arr), len(noise_arr))
     # limits = np.min(np.percentile(noise_arr, 0, axis=0)), np.max(np.percentile(noise_arr, 99.99, axis=0))
-    limits = (np.min(noise_arr, axis=0), np.max(noise_arr, axis=0))
+    limits = (np.min(noise_arr, axis=(0, 1)), np.max(noise_arr, axis=(0, 1)))
+
     for n in range(4):
         ax[n].plot(t, noise_arr[:, n], color='C' + str(n), alpha=.6, linewidth=1)
         ax[n].set_ylabel('$\mu V$')
