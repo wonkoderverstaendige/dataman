@@ -436,7 +436,7 @@ def main(args):
 
                 t_fig = ds_plot_features(t_images, how='log', fet_titles=t_titles)
                 frf.write(fig2html(t_fig) + '</br>\n')
-                plt.close(fig)
+                plt.close(t_fig)
                 del t_fig
 
                 frf.write('</hr>\n')
