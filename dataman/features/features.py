@@ -411,7 +411,7 @@ def main(args):
 
                 fet_fig = ds_plot_features(images, how='log', fet_titles=titles)
                 frf.write(fig2html(fet_fig) + '</br>\n')
-                plt.close(fig)
+                plt.close(fet_fig)
                 del fet_fig
 
                 # Features over time
