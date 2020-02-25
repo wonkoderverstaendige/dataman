@@ -256,6 +256,7 @@ def main(args):
     # Late-load reporting library.
     # Without, just requesting the help takes forever due to datashader, dask and numba
     from dataman.lib.report import fig2html, ds_shade_waveforms, ds_plot_waveforms, ds_shade_feature, ds_plot_features
+    from matplotlib import pyplot as plt
     # TODO:
     # per feature arguments
 
