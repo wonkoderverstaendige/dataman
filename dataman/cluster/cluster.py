@@ -1,3 +1,4 @@
+import sys
 import argparse
 import logging
 import shutil
@@ -53,6 +54,8 @@ def run_kk(params, run_kk=True):
     # Combine executable and arguments
     kk_executable = cfg["kk_executable"]
     kk_cmd = f'{kk_executable} {tetrode_file_stem} -ElecNo {tetrode_file_elecno} -UseFeatures {validity_string}'
+    if cfg['KKv3']:
+        kk_cmd += ' -UseDistributional 0'
     kk_cmd_list = kk_cmd.split(' ')
     logger.debug(f'KK COMMAND: {kk_cmd}')
     logger.debug(f'KK COMMAND LIST: {kk_cmd_list}')
@@ -160,6 +163,8 @@ def main(args):
     parser.add_argument('-N', '--num_proc',
                         help='Number of KlustaKwik instances to run in parallel, defaults to 0 (all)', type=int,
                         default=0)
+    parser.add_argument('--KKv3', action='store_true',
+                        help='Running KlustaKwik v3 requires additional parameters for the call.')
     cli_args = parser.parse_args(args)
 
     # Load default configuration yaml file
@@ -227,6 +232,4 @@ def main(args):
 
 
 if __name__ == '__main__':
-    import sys
-
     main(sys.argv[1:])
