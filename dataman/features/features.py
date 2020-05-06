@@ -312,24 +312,24 @@ def main(args):
                 cpca = scale_feature(feature_cPCA(waveforms))
                 logger.debug('cPCA shape {}'.format(cpca.shape))
                 features['cPCA'] = cpca
-                validities['cPCA'] = [1] * features['cPCA'].shape[1]
+                validities['cPCA'] = channel_validity #[1] * features['cPCA'].shape[1]
 
             elif fet_name == 'cpca24':
                 logging.debug(f'Calculating {fet_name} feature')
                 cpca24 = scale_feature(feature_cPCA24(waveforms))
                 logger.debug('cPCA24 shape {}'.format(cpca24.shape))
                 features['cPCA24'] = cpca24
-                validities['cPCA24'] = [1] * features['cPCA24'].shape[1]
+                validities['cPCA24'] = channel_validity #[1] * features['cPCA24'].shape[1]
 
             elif fet_name == 'chwpca':
                 logging.debug(f'Calculating {fet_name} feature')
                 chwpca = scale_feature(feature_chwPCA(waveforms))
                 logger.debug('chwPCA shape {}'.format(chwpca.shape))
                 features['chwPCA'] = chwpca
-                validities['chwPCA'] = [1] * features['chwPCA'].shape[1]
+                validities['chwPCA'] = channel_validity #[1] * features['chwPCA'].shape[1]
 
             else:
-                raise NotImplementedError("Unknonw feature: {}".format(fet_name))
+                raise NotImplementedError("Unknown feature: {}".format(fet_name))
 
         # TODO:
         # fet_cpca_4 = fet_cpca[:, :4]
