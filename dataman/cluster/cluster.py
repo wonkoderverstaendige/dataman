@@ -160,6 +160,7 @@ def main(args):
     parser.add_argument('--config', help='Path to configuration file')
     parser.add_argument('--skip', help='Skip if clu file exists already', action='store_true')
     parser.add_argument('--no_spread', help='Shade report plots without static spread', action='store_true')
+    parser.add_argument('--kkargs', help='Additional KK parameters', type=str, default='')
     parser.add_argument('-N', '--num_proc',
                         help='Number of KlustaKwik instances to run in parallel, defaults to 0 (all)', type=int,
                         default=0)
@@ -221,7 +222,8 @@ def main(args):
 
     # for tfp in tetrode_files:
     params = [(cfg, tfp) for tfp in tetrode_files]
-    print(len(params))
+    params.append(cli_args.kkargs)
+    print(params)
 
     results = pool.map_async(run_kk, params)
 
