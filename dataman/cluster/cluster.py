@@ -165,7 +165,8 @@ def main(args):
     parser.add_argument('--config', help='Path to configuration file')
     parser.add_argument('--skip', help='Skip if clu file exists already', action='store_true')
     parser.add_argument('--no_spread', help='Shade report plots without static spread', action='store_true')
-    parser.add_argument('--kkargs', help='Additional KK parameters', type=str, default='-MaxPossibleClusters 35')
+    parser.add_argument('--kkargs', help='Additional KK parameters, default: {-MaxPossibleClusters 35}',
+                        type=str, default='-MaxPossibleClusters 35')
     parser.add_argument('-N', '--num_proc',
                         help='Number of KlustaKwik instances to run in parallel, defaults to 0 (all)', type=int,
                         default=0)
@@ -209,7 +210,7 @@ def main(args):
         raise FileNotFoundError('Could not find the KlustaKwik executable on the path, and none given.')
 
     cfg['kk_executable'] = cli_args.KK
-    cfg['kk_ardditional_args'] = cli_args.kkargs
+    cfg['kk_additional_args'] = cli_args.kkargs
 
     logger.debug(cfg)
 
