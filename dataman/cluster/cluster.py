@@ -57,9 +57,10 @@ def run_kk(params, run_kk=True):
     if cfg['KKv3']:
         kk_cmd += ' -UseDistributional 0'
 
+    logger.debug('kk_cmd:' )
     # additional command line options
-    if (cfg.kk_additional_args):
-        kk_cmd += ' ' + cfg.kk_additional_args
+    if (cfg['kk_additional_args']):
+        kk_cmd += ' ' + cfg['kk_additional_args']
 
     kk_cmd_list = kk_cmd.split(' ')
     logger.debug(f'KK COMMAND: {kk_cmd}')
