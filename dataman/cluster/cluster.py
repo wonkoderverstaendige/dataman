@@ -166,8 +166,8 @@ def main(args):
     parser.add_argument('--config', help='Path to configuration file')
     parser.add_argument('--skip', help='Skip if clu file exists already', action='store_true')
     parser.add_argument('--no_spread', help='Shade report plots without static spread', action='store_true')
-    parser.add_argument('--kkargs', help='Additional KK parameters, default: {-MaxPossibleClusters 35}',
-                        type=str, default='-MaxPossibleClusters 35')
+    parser.add_argument('--kkargs', help='Additional KK parameters, default: {-MaxPossibleClusters 35 -MaxIter 2000}',
+                        type=str, default='-MaxPossibleClusters 35 -MaxIter 2000')
     parser.add_argument('-N', '--num_proc',
                         help='Number of KlustaKwik instances to run in parallel, defaults to 0 (all)', type=int,
                         default=0)
@@ -225,13 +225,13 @@ def main(args):
     logger.debug(f'Targets found: {tetrode_files}')
 
     from multiprocessing.pool import ThreadPool
-    num_procs = cli_args.num_proc if cli_args.num_proc > 0 else len(tetrode_files)
-    pool = ThreadPool(processes=num_procs)
+    num_threads = cli_args.num_proc if cli_args.num_proc > 0 else len(tetrode_files)
 
-    # for tfp in tetrode_files:
+    logger.info('Launching ThreadPool')
+    pool = ThreadPool(processes=num_threads)
+
     params = [(cfg, tfp) for tfp in tetrode_files]
     params.append(cli_args.kkargs)
-    print(params)
 
     results = pool.map_async(run_kk, params)
 
@@ -239,7 +239,6 @@ def main(args):
     pool.join()
 
     print(results)
-
 
 if __name__ == '__main__':
     main(sys.argv[1:])
